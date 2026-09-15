@@ -1,0 +1,48 @@
+{
+  "name": "duplex",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Realtime chat with group conversations and 1:1 WebRTC calling, self-hosted on a single VPS",
+  "license": "MIT",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c cyan,magenta \"npm run dev -w @duplex/backend\" \"npm run dev -w @duplex/frontend\"",
+    "dev:backend": "npm run dev -w @duplex/backend",
+    "dev:frontend": "npm run dev -w @duplex/frontend",
+    "build": "npm run build -w @duplex/backend && npm run build -w @duplex/frontend",
+    "build:backend": "npm run build -w @duplex/backend",
+    "build:frontend": "npm run build -w @duplex/frontend",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "start": "pm2 start ecosystem.config.cjs",
+    "reload": "pm2 reload ecosystem.config.cjs --update-env",
+    "stop": "pm2 stop ecosystem.config.cjs",
+    "logs": "pm2 logs --lines 100",
+    "deploy": "npm run build:backend && npm run db:deploy && npm run reload",
+    "db:generate": "npm run db:generate -w @duplex/backend",
+    "db:migrate": "npm run db:migrate -w @duplex/backend",
+    "db:deploy": "npm run db:deploy -w @duplex/backend",
+    "db:status": "npm run db:status -w @duplex/backend",
+    "db:studio": "npm run db:studio -w @duplex/backend",
+    "db:seed": "npm run db:seed -w @duplex/backend"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "concurrently": "^9.2.1"
+  },
+  "allowScripts": {
+    "bcrypt@6.0.0": true,
+    "esbuild@0.28.2": true,
+    "prisma@7.10.0": true,
+    "@prisma/engines@7.10.0": true,
+    "unrs-resolver@1.12.2": true,
+    "sharp@0.34.5": true
+  }
+}
