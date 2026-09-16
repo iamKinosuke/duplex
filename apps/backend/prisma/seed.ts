@@ -1,7 +1,7 @@
-import bcrypt from "bcrypt";
 import { randomUUID } from "node:crypto";
 
 import { prisma } from "../src/db/prisma.js";
+import { hashPassword } from "../src/utils/password.js";
 import { ConversationType, MemberRole, MessageType } from "../src/generated/prisma/client.js";
 
 const PASSWORD = "password123";
@@ -14,13 +14,13 @@ const PEOPLE = [
 ] as const;
 
 async function main(): Promise<void> {
-  const passwordHash = await bcrypt.hash(PASSWORD, 12);
+  const passwordHash = await hashPassword(PASSWORD);
 
   const users = [];
   for (const person of PEOPLE) {
     const user = await prisma.user.upsert({
       where: { username: person.username },
-      update: { displayName: person.displayName, bio: person.bio },
+      update: { displayName: person.displayName, bio: person.bio, passwordHash },
       create: {
         username: person.username,
         email: `${person.username}@example.com`,

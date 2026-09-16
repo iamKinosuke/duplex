@@ -19,5 +19,5 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts", "prisma/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "prisma/**/*.ts"]
 }

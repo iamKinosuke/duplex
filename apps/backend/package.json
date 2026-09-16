@@ -10,8 +10,6 @@
     "build": "prisma generate && rm -rf dist && node build.mjs",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -46,7 +44,6 @@
     "esbuild": "^0.28.0",
     "prisma": "^7.9.1",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "typescript": "^5.9.3"
   }
 }

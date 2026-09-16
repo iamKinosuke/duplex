@@ -31,6 +31,10 @@ const schema = z.object({
   RATE_LIMIT_LOGIN_WINDOW_MS: z.coerce.number().int().min(1).default(300_000),
   RATE_LIMIT_MESSAGE_MAX: z.coerce.number().int().min(1).default(30),
   RATE_LIMIT_MESSAGE_WINDOW_MS: z.coerce.number().int().min(1).default(10_000),
+  RATE_LIMIT_REFRESH_MAX: z.coerce.number().int().min(1).default(60),
+  RATE_LIMIT_REFRESH_WINDOW_MS: z.coerce.number().int().min(1).default(300_000),
+  RATE_LIMIT_PROFILE_MAX: z.coerce.number().int().min(1).default(20),
+  RATE_LIMIT_PROFILE_WINDOW_MS: z.coerce.number().int().min(1).default(60_000),
 });
 
 const parsed = schema.safeParse(process.env);
