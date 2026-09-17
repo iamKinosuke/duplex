@@ -20,23 +20,42 @@ export function signAccessToken(
   });
 }
 
-export function verifyAccessToken(
+export type AccessTokenResult =
+  | { ok: true; payload: AccessTokenPayload }
+  | { ok: false; reason: "expired" | "invalid" };
+
+export function readAccessToken(
   token: string,
   secret: string,
-): AccessTokenPayload | null {
+): AccessTokenResult {
   try {
     const decoded = jwt.verify(token, secret, { algorithms: ["HS256"] });
 
-    if (typeof decoded !== "object" || decoded === null) return null;
+    if (typeof decoded !== "object" || decoded === null) {
+      return { ok: false, reason: "invalid" };
+    }
 
     const { sub, username } = decoded as jwt.JwtPayload & {
       username?: unknown;
     };
 
-    if (typeof sub !== "string" || typeof username !== "string") return null;
+    if (typeof sub !== "string" || typeof username !== "string") {
+      return { ok: false, reason: "invalid" };
+    }
 
-    return { sub, username };
-  } catch {
-    return null;
+    return { ok: true, payload: { sub, username } };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof jwt.TokenExpiredError ? "expired" : "invalid",
+    };
   }
+}
+
+export function verifyAccessToken(
+  token: string,
+  secret: string,
+): AccessTokenPayload | null {
+  const result = readAccessToken(token, secret);
+  return result.ok ? result.payload : null;
 }

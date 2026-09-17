@@ -2,9 +2,13 @@ import { createServer } from "node:http";
 
 import { createApp } from "./app.js";
 import { env, databaseLabel } from "./config/env.js";
-import { assertDatabaseReachable, disconnectDatabase } from "./db/prisma.js";
+import { assertDatabaseReachable, disconnectDatabase, prisma } from "./db/prisma.js";
 import { logger } from "./lib/logger.js";
 import { connectRedis, createRedisClients } from "./lib/redis.js";
+import { createRealtimeBridge } from "./realtime/bridge.js";
+import { createRealtimeServer } from "./realtime/server.js";
+import { createConversationRepository } from "./repositories/conversation.repository.js";
+import { createUserRepository } from "./repositories/user.repository.js";
 
 const SHUTDOWN_TIMEOUT_MS = 15_000;
 
@@ -16,14 +20,29 @@ async function main(): Promise<void> {
   const redis = createRedisClients();
   await connectRedis(redis);
 
-  const app = createApp({ redis });
+  const bridge = createRealtimeBridge();
+
+  const app = createApp({ redis, conversationEvents: bridge });
   const server = createServer(app);
+
+  const io = createRealtimeServer({
+    httpServer: server,
+    redis,
+    users: createUserRepository(prisma),
+    conversations: createConversationRepository(prisma),
+    secret: env.JWT_SECRET,
+    frontendOrigin: env.FRONTEND_ORIGIN,
+    adapterKey: `${env.REDIS_PREFIX}socket.io`,
+  });
+
+  bridge.attach(io);
 
   server.listen(env.PORT, () => {
     logger.info("api listening", {
       url: `http://localhost:${env.PORT}`,
       env: env.NODE_ENV,
       pid: process.pid,
+      socket: "/socket.io",
     });
   });
 
@@ -42,7 +61,7 @@ async function main(): Promise<void> {
       }, SHUTDOWN_TIMEOUT_MS);
       forceExit.unref();
 
-      server.close(() => {
+      io.close(() => {
         void (async () => {
           await Promise.allSettled([disconnectDatabase(), redis.close()]);
           clearTimeout(forceExit);
