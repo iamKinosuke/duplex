@@ -12,6 +12,18 @@ const MESSAGE_TYPE: Record<PrismaMessageType, MessageType> = {
   [PrismaMessageType.SYSTEM]: "system",
 };
 
+const TO_PRISMA_TYPE: Record<MessageType, PrismaMessageType> = {
+  text: PrismaMessageType.TEXT,
+  image: PrismaMessageType.IMAGE,
+  file: PrismaMessageType.FILE,
+  voice: PrismaMessageType.VOICE,
+  system: PrismaMessageType.SYSTEM,
+};
+
+export function fromMessageType(type: MessageType): PrismaMessageType {
+  return TO_PRISMA_TYPE[type];
+}
+
 export function toMessage(row: MessageRow): Message {
   const deletedAt = optionalIso(row.deletedAt);
 

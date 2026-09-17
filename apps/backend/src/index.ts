@@ -8,7 +8,9 @@ import { connectRedis, createRedisClients } from "./lib/redis.js";
 import { createRealtimeBridge } from "./realtime/bridge.js";
 import { createRealtimeServer } from "./realtime/server.js";
 import { createConversationRepository } from "./repositories/conversation.repository.js";
+import { createMessageRepository } from "./repositories/message.repository.js";
 import { createUserRepository } from "./repositories/user.repository.js";
+import { createMessageService } from "./services/message.service.js";
 
 const SHUTDOWN_TIMEOUT_MS = 15_000;
 
@@ -22,17 +24,31 @@ async function main(): Promise<void> {
 
   const bridge = createRealtimeBridge();
 
-  const app = createApp({ redis, conversationEvents: bridge });
+  const app = createApp({
+    redis,
+    conversationEvents: bridge,
+    sessionEvents: bridge,
+  });
   const server = createServer(app);
+
+  const conversationRepository = createConversationRepository(prisma);
 
   const io = createRealtimeServer({
     httpServer: server,
     redis,
     users: createUserRepository(prisma),
-    conversations: createConversationRepository(prisma),
+    conversations: conversationRepository,
+    messages: createMessageService({
+      messages: createMessageRepository(prisma),
+      conversations: conversationRepository,
+    }),
     secret: env.JWT_SECRET,
     frontendOrigin: env.FRONTEND_ORIGIN,
     adapterKey: `${env.REDIS_PREFIX}socket.io`,
+    sendRateLimit: {
+      max: env.RATE_LIMIT_MESSAGE_MAX,
+      windowMs: env.RATE_LIMIT_MESSAGE_WINDOW_MS,
+    },
   });
 
   bridge.attach(io);
