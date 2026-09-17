@@ -36,6 +36,11 @@ export const zConversationDetail = zConversationSummary.extend({
 });
 export type ConversationDetail = z.infer<typeof zConversationDetail>;
 
+export const zConversationList = z.object({
+  items: z.array(zConversationSummary),
+});
+export type ConversationList = z.infer<typeof zConversationList>;
+
 export const zCreateDirectBody = z.object({
   userId: zId,
 });

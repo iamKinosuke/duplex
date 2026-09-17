@@ -5,6 +5,7 @@ import helmet from "helmet";
 
 import { env, isProduction, trustProxySetting } from "./config/env.js";
 import { createAuthController } from "./controllers/auth.controller.js";
+import { createConversationController } from "./controllers/conversation.controller.js";
 import { createUserController } from "./controllers/user.controller.js";
 import { prisma } from "./db/prisma.js";
 import { requireAuth } from "./middleware/auth.js";
@@ -16,11 +17,16 @@ import {
   ruleFromWindow,
   type RateLimitOptions,
 } from "./middleware/rate-limit.js";
+import { createConversationRepository } from "./repositories/conversation.repository.js";
+import { createMessageRepository } from "./repositories/message.repository.js";
 import { createRefreshTokenRepository } from "./repositories/refresh-token.repository.js";
 import { createUserRepository } from "./repositories/user.repository.js";
 import { createAuthRouter } from "./routes/auth.routes.js";
+import { createConversationRouter } from "./routes/conversation.routes.js";
 import { createUserRouter } from "./routes/user.routes.js";
 import { createAuthService } from "./services/auth.service.js";
+import { createConversationService } from "./services/conversation.service.js";
+import { createMessageService } from "./services/message.service.js";
 import { createTokenService } from "./services/token.service.js";
 import { createUserService } from "./services/user.service.js";
 import type { RedisClients } from "./lib/redis.js";
@@ -45,6 +51,8 @@ export function createApp(deps: CreateAppDeps = {}): Express {
 
   const userRepository = createUserRepository(prisma);
   const refreshTokenRepository = createRefreshTokenRepository(prisma);
+  const conversationRepository = createConversationRepository(prisma);
+  const messageRepository = createMessageRepository(prisma);
 
   const tokenService = createTokenService({
     refreshTokens: refreshTokenRepository,
@@ -66,9 +74,21 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     tokens: tokenService,
   });
   const userService = createUserService({ users: userRepository });
+  const conversationService = createConversationService({
+    conversations: conversationRepository,
+    users: userRepository,
+  });
+  const messageService = createMessageService({
+    messages: messageRepository,
+    conversations: conversationRepository,
+  });
 
   const authController = createAuthController({ service: authService, cookie });
   const userController = createUserController({ service: userService });
+  const conversationController = createConversationController({
+    conversations: conversationService,
+    messages: messageService,
+  });
 
   const limiter =
     deps.redis !== undefined
@@ -141,6 +161,35 @@ export function createApp(deps: CreateAppDeps = {}): Express {
           env.RATE_LIMIT_PROFILE_WINDOW_MS,
         ),
         keyPrefix: "rl:profile",
+      }),
+      searchRateLimit: limit({
+        rule: ruleFromWindow(
+          env.RATE_LIMIT_SEARCH_MAX,
+          env.RATE_LIMIT_SEARCH_WINDOW_MS,
+        ),
+        keyPrefix: "rl:search",
+      }),
+    }),
+  );
+
+  app.use(
+    "/api/conversations",
+    createConversationRouter({
+      controller: conversationController,
+      requireAuth: authGuard,
+      readRateLimit: limit({
+        rule: ruleFromWindow(
+          env.RATE_LIMIT_READ_MAX,
+          env.RATE_LIMIT_READ_WINDOW_MS,
+        ),
+        keyPrefix: "rl:read",
+      }),
+      writeRateLimit: limit({
+        rule: ruleFromWindow(
+          env.RATE_LIMIT_MESSAGE_MAX,
+          env.RATE_LIMIT_MESSAGE_WINDOW_MS,
+        ),
+        keyPrefix: "rl:write",
       }),
     }),
   );
