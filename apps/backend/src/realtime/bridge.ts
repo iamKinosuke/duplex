@@ -1,13 +1,14 @@
 import { ROOM } from "@duplex/shared";
 
 import { logger } from "../lib/logger.js";
+import type { SessionEvents } from "../services/auth.service.js";
 import type {
   ConversationCreatedEvent,
   ConversationEvents,
 } from "../services/conversation.service.js";
 import type { RealtimeServer } from "./server.js";
 
-export interface RealtimeBridge extends ConversationEvents {
+export interface RealtimeBridge extends ConversationEvents, SessionEvents {
   attach(io: RealtimeServer): void;
 }
 
@@ -35,6 +36,13 @@ export function createRealtimeBridge(): RealtimeBridge {
         conversationId: event.conversationId,
         viewers: event.viewers.length,
       });
+    },
+
+    sessionsRevoked(userId: string) {
+      if (io === null) return;
+
+      io.in(ROOM.user(userId)).disconnectSockets(true);
+      logger.debug("sockets disconnected after sign-out", { userId });
     },
   };
 }

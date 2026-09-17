@@ -35,7 +35,7 @@ export interface TokenService {
     rawToken: string,
     userAgent: string | null,
   ): Promise<RotatedRefresh>;
-  revokeSession(rawToken: string): Promise<void>;
+  revokeSession(rawToken: string): Promise<bigint | null>;
   hashToken(rawToken: string): string;
 }
 
@@ -128,9 +128,10 @@ export function createTokenService(deps: TokenServiceDeps): TokenService {
       const stored = await deps.refreshTokens.findByHash(
         hashRefreshToken(rawToken),
       );
-      if (stored === null) return;
+      if (stored === null) return null;
 
       await deps.refreshTokens.deleteFamily(stored.familyId);
+      return stored.userId;
     },
 
     hashToken(rawToken) {

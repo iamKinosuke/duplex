@@ -26,9 +26,14 @@ export interface RequestContext {
   userAgent: string | null;
 }
 
+export interface SessionEvents {
+  sessionsRevoked(userId: string): void;
+}
+
 export interface AuthServiceDeps {
   users: UserRepository;
   tokens: TokenService;
+  events?: SessionEvents | undefined;
 }
 
 export interface AuthService {
@@ -127,7 +132,11 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     },
 
     async logout(rawToken) {
-      await deps.tokens.revokeSession(rawToken);
+      const userId = await deps.tokens.revokeSession(rawToken);
+
+      if (userId !== null && deps.events !== undefined) {
+        deps.events.sessionsRevoked(userId.toString());
+      }
     },
   };
 }

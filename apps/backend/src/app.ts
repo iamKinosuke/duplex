@@ -24,7 +24,10 @@ import { createUserRepository } from "./repositories/user.repository.js";
 import { createAuthRouter } from "./routes/auth.routes.js";
 import { createConversationRouter } from "./routes/conversation.routes.js";
 import { createUserRouter } from "./routes/user.routes.js";
-import { createAuthService } from "./services/auth.service.js";
+import {
+  createAuthService,
+  type SessionEvents,
+} from "./services/auth.service.js";
 import {
   createConversationService,
   type ConversationEvents,
@@ -38,6 +41,7 @@ import type { RefreshCookieConfig } from "./utils/cookies.js";
 export interface CreateAppDeps {
   redis?: RedisClients;
   conversationEvents?: ConversationEvents;
+  sessionEvents?: SessionEvents;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -76,6 +80,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const authService = createAuthService({
     users: userRepository,
     tokens: tokenService,
+    events: deps.sessionEvents,
   });
   const userService = createUserService({ users: userRepository });
   const conversationService = createConversationService({
