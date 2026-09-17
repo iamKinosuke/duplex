@@ -8,9 +8,24 @@ import type {
 import type { UserRepository } from "../repositories/user.repository.js";
 import { toDetail, toSummary } from "../utils/conversation.serialize.js";
 
+export interface ConversationViewerPayload {
+  userId: string;
+  conversation: ConversationDetail;
+}
+
+export interface ConversationCreatedEvent {
+  conversationId: string;
+  viewers: ConversationViewerPayload[];
+}
+
+export interface ConversationEvents {
+  conversationCreated(event: ConversationCreatedEvent): void;
+}
+
 export interface ConversationServiceDeps {
   conversations: ConversationRepository;
   users: UserRepository;
+  events?: ConversationEvents | undefined;
 }
 
 export interface DirectConversationResult {
@@ -87,11 +102,19 @@ export function createConversationService(
       }
 
       const result = await deps.conversations.createDirect(userId, peerId);
+      const conversation = await detailFor(result.conversation, userId);
 
-      return {
-        conversation: await detailFor(result.conversation, userId),
-        created: result.created,
-      };
+      if (result.created && deps.events !== undefined) {
+        deps.events.conversationCreated({
+          conversationId: conversation.id,
+          viewers: result.conversation.members.map((member) => ({
+            userId: member.userId.toString(),
+            conversation: toDetail(result.conversation, member.userId, 0),
+          })),
+        });
+      }
+
+      return { conversation, created: result.created };
     },
   };
 }

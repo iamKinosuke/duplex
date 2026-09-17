@@ -71,6 +71,7 @@ export interface DirectResult {
 
 export interface ConversationRepository {
   listForUser(userId: bigint): Promise<ConversationSummaryRow[]>;
+  idsForUser(userId: bigint): Promise<bigint[]>;
   unreadCountsFor(userId: bigint): Promise<UnreadCount[]>;
   unreadCountIn(
     conversationId: bigint,
@@ -119,6 +120,15 @@ export function createConversationRepository(
         select: summarySelect,
         orderBy: { conversation: { updatedAt: "desc" } },
       });
+    },
+
+    async idsForUser(userId) {
+      const rows = await client.conversationMember.findMany({
+        where: { userId },
+        select: { conversationId: true },
+      });
+
+      return rows.map((row) => row.conversationId);
     },
 
     async unreadCountsFor(userId) {
