@@ -57,6 +57,7 @@ export interface UserRepository {
   existsById(id: bigint): Promise<boolean>;
   updateProfile(id: bigint, data: UpdateProfileData): Promise<UserRecord>;
   search(options: SearchUsersOptions): Promise<PublicUserRow[]>;
+  touchLastSeen(id: bigint, at: Date): Promise<void>;
 }
 
 export interface SearchUsersOptions {
@@ -116,6 +117,10 @@ export function createUserRepository(client: PrismaClient): UserRepository {
       if (data.avatarUrl !== undefined) patch.avatarUrl = data.avatarUrl;
 
       return await client.user.update({ where: { id }, data: patch });
+    },
+
+    async touchLastSeen(id, at) {
+      await client.user.updateMany({ where: { id }, data: { lastSeenAt: at } });
     },
 
     async search({ query, limit, excludeUserId }) {

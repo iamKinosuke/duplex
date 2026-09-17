@@ -72,6 +72,7 @@ export interface DirectResult {
 export interface ConversationRepository {
   listForUser(userId: bigint): Promise<ConversationSummaryRow[]>;
   idsForUser(userId: bigint): Promise<bigint[]>;
+  peerIdsIn(conversationIds: bigint[], excludeUserId: bigint): Promise<bigint[]>;
   unreadCountsFor(userId: bigint): Promise<UnreadCount[]>;
   unreadCountIn(
     conversationId: bigint,
@@ -129,6 +130,21 @@ export function createConversationRepository(
       });
 
       return rows.map((row) => row.conversationId);
+    },
+
+    async peerIdsIn(conversationIds, excludeUserId) {
+      if (conversationIds.length === 0) return [];
+
+      const rows = await client.conversationMember.findMany({
+        where: {
+          conversationId: { in: conversationIds },
+          userId: { not: excludeUserId },
+        },
+        select: { userId: true },
+        distinct: ["userId"],
+      });
+
+      return rows.map((row) => row.userId);
     },
 
     async unreadCountsFor(userId) {
