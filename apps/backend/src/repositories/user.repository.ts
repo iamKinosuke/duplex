@@ -12,6 +12,19 @@ export interface UserRecord {
   createdAt: Date;
 }
 
+export const publicUserSelect = {
+  id: true,
+  username: true,
+  displayName: true,
+  avatarUrl: true,
+  bio: true,
+  lastSeenAt: true,
+} satisfies Prisma.UserSelect;
+
+export type PublicUserRow = Prisma.UserGetPayload<{
+  select: typeof publicUserSelect;
+}>;
+
 export type DuplicateField = "email" | "username";
 
 export class DuplicateUserError extends Error {
@@ -43,6 +56,13 @@ export interface UserRepository {
   findById(id: bigint): Promise<UserRecord | null>;
   existsById(id: bigint): Promise<boolean>;
   updateProfile(id: bigint, data: UpdateProfileData): Promise<UserRecord>;
+  search(options: SearchUsersOptions): Promise<PublicUserRow[]>;
+}
+
+export interface SearchUsersOptions {
+  query: string;
+  limit: number;
+  excludeUserId: bigint;
 }
 
 function duplicateFieldOf(error: unknown): DuplicateField | null {
@@ -96,6 +116,18 @@ export function createUserRepository(client: PrismaClient): UserRepository {
       if (data.avatarUrl !== undefined) patch.avatarUrl = data.avatarUrl;
 
       return await client.user.update({ where: { id }, data: patch });
+    },
+
+    async search({ query, limit, excludeUserId }) {
+      return await client.user.findMany({
+        where: {
+          id: { not: excludeUserId },
+          OR: [{ username: { contains: query } }, { displayName: { contains: query } }],
+        },
+        select: publicUserSelect,
+        orderBy: [{ username: "asc" }],
+        take: limit,
+      });
     },
   };
 }

@@ -1,5 +1,9 @@
 import type { RequestHandler } from "express";
-import { zUpdateProfileBody } from "@duplex/shared";
+import {
+  zUpdateProfileBody,
+  zUserSearchQuery,
+  type UserList,
+} from "@duplex/shared";
 
 import { currentUser } from "../middleware/auth.js";
 import type { UserService } from "../services/user.service.js";
@@ -21,5 +25,15 @@ export function createUserController(deps: UserControllerDeps) {
     res.status(200).json(await deps.service.updateProfile(user.id, body));
   };
 
-  return { me, updateProfile };
+  const search: RequestHandler = async (req, res) => {
+    const user = currentUser(req);
+    const query = zUserSearchQuery.parse(req.query);
+
+    const payload: UserList = {
+      items: await deps.service.search(user.id, query.q, query.limit),
+    };
+    res.status(200).json(payload);
+  };
+
+  return { me, updateProfile, search };
 }

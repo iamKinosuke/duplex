@@ -28,6 +28,17 @@ export const zUpdateProfileBody = z.object({
 });
 export type UpdateProfileBody = z.infer<typeof zUpdateProfileBody>;
 
+export const zUserList = z.object({
+  items: z.array(zUser),
+});
+export type UserList = z.infer<typeof zUserList>;
+
+export const zUserSearchQuery = z.object({
+  q: z.string().trim().min(1).max(64),
+  limit: z.coerce.number().int().min(1).max(25).default(10),
+});
+export type UserSearchQuery = z.infer<typeof zUserSearchQuery>;
+
 export const zPresence = z.object({
   userId: zId,
   status: zPresenceStatus,
