@@ -1,7 +1,7 @@
 "use client";
 
 import type { Me } from "@duplex/shared";
-import { LogOut, MessagesSquare, Search, SquarePen, UserRound } from "lucide-react";
+import { LogOut, Search, SquarePen, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { BrandWordmark } from "@/components/brand";
@@ -22,6 +22,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ConversationList } from "@/features/conversation/conversation-list";
+import { NewConversationDialog } from "@/features/conversation/new-conversation-dialog";
 import { useLogout } from "@/features/auth/session";
 import { ProfileDialog } from "@/features/profile/profile-dialog";
 
@@ -43,14 +45,14 @@ export function Sidebar({ me }: { me: Me }) {
           <ThemeToggle />
           <Tooltip>
             <TooltipTrigger asChild>
-              <span tabIndex={0}>
-                <Button variant="ghost" size="icon-sm" disabled>
+              <NewConversationDialog>
+                <Button variant="ghost" size="icon-sm">
                   <SquarePen className="size-4" />
                   <span className="sr-only">New conversation</span>
                 </Button>
-              </span>
+              </NewConversationDialog>
             </TooltipTrigger>
-            <TooltipContent>Arriving in phase 3</TooltipContent>
+            <TooltipContent>Start a conversation</TooltipContent>
           </Tooltip>
         </div>
       </header>
@@ -62,18 +64,8 @@ export function Sidebar({ me }: { me: Me }) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3">
-        <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-hairline px-5 py-10 text-center">
-          <span className="grid size-14 -rotate-3 place-items-center rounded-2xl border-2 border-ink bg-lemon text-ink shadow-sticker">
-            <MessagesSquare className="size-6" />
-          </span>
-          <div className="space-y-1">
-            <p className="font-display font-semibold">Nothing here yet</p>
-            <p className="text-xs text-muted-foreground">
-              Direct messages and group rooms land in phase 3.
-            </p>
-          </div>
-        </div>
+      <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+        <ConversationList />
       </div>
 
       <footer className="shrink-0 border-t-2 border-hairline p-3">
