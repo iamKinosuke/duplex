@@ -8,10 +8,7 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@duplex/shared"],
 
   async rewrites() {
-    return [
-      { source: "/api/:path*", destination: `${BACKEND_ORIGIN}/api/:path*` },
-      { source: "/socket.io/:path*", destination: `${BACKEND_ORIGIN}/socket.io/:path*` },
-    ];
+    return [{ source: "/api/:path*", destination: `${BACKEND_ORIGIN}/api/:path*` }];
   },
 };
 
