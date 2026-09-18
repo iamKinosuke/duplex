@@ -36,9 +36,16 @@ export interface SendResult {
   created: boolean;
 }
 
+export interface MarkReadRequest {
+  conversationId: bigint;
+  userId: bigint;
+  lastMessageId: bigint;
+}
+
 export interface MessageService {
   page(request: PageRequest): Promise<MessagePage>;
   send(request: SendRequest): Promise<SendResult>;
+  markRead(request: MarkReadRequest): Promise<boolean>;
 }
 
 const NOT_FOUND = "That conversation does not exist.";
@@ -68,6 +75,16 @@ export function createMessageService(deps: MessageServiceDeps): MessageService {
         items: result.items.map(toMessage),
         nextCursor: result.nextCursor === null ? null : id(result.nextCursor),
       };
+    },
+
+    async markRead({ conversationId, userId, lastMessageId }) {
+      await assertMember(conversationId, userId);
+
+      return await deps.conversations.markRead(
+        conversationId,
+        userId,
+        lastMessageId,
+      );
     },
 
     async send(request) {

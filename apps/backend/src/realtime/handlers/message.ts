@@ -1,11 +1,13 @@
 import {
   CLIENT_EVENT_SCHEMAS,
   ROOM,
+  toId,
   type AckFn,
   type Message,
 } from "@duplex/shared";
 
 import { AppError } from "../../errors/AppError.js";
+import { logger } from "../../lib/logger.js";
 import type { RateLimiter, RateLimitRule } from "../../middleware/rate-limit.js";
 import type { MessageService } from "../../services/message.service.js";
 import { toBigInt } from "../../utils/serialize.js";
@@ -66,6 +68,33 @@ export function registerMessageHandlers(
         ack(success(result.message));
       } catch (error) {
         ack(failure(error));
+      }
+    })();
+  });
+
+  socket.on("read:ack", (payload) => {
+    void (async () => {
+      try {
+        const event = CLIENT_EVENT_SCHEMAS["read:ack"].parse(payload);
+
+        const advanced = await deps.messages.markRead({
+          conversationId: toBigInt(event.conversationId),
+          userId: toBigInt(userId),
+          lastMessageId: toBigInt(event.lastMessageId),
+        });
+
+        if (!advanced) return;
+
+        deps.io.to(ROOM.conversation(event.conversationId)).emit("read:update", {
+          conversationId: event.conversationId,
+          userId: toId(userId),
+          lastMessageId: event.lastMessageId,
+        });
+      } catch (error) {
+        logger.debug("read:ack ignored", {
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     })();
   });

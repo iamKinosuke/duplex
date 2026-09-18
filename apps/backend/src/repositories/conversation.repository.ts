@@ -87,6 +87,11 @@ export interface ConversationRepository {
     conversationId: bigint,
     userId: bigint,
   ): Promise<{ lastReadMessageId: bigint } | null>;
+  markRead(
+    conversationId: bigint,
+    userId: bigint,
+    lastMessageId: bigint,
+  ): Promise<boolean>;
   createDirect(userId: bigint, peerId: bigint): Promise<DirectResult>;
 }
 
@@ -190,6 +195,19 @@ export function createConversationRepository(
         where: { conversationId_userId: { conversationId, userId } },
         select: { lastReadMessageId: true },
       });
+    },
+
+    async markRead(conversationId, userId, lastMessageId) {
+      const result = await client.conversationMember.updateMany({
+        where: {
+          conversationId,
+          userId,
+          lastReadMessageId: { lt: lastMessageId },
+        },
+        data: { lastReadMessageId: lastMessageId },
+      });
+
+      return result.count === 1;
     },
 
     async createDirect(userId, peerId) {
