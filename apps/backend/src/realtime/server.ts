@@ -74,6 +74,13 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
   io.use(createHandshakeAuth({ secret: deps.secret, users: deps.users }));
 
   io.on("connection", (socket) => {
+    registerMessageHandlers(socket, {
+      io,
+      messages: deps.messages,
+      limiter,
+      sendRule,
+    });
+
     void welcome(socket);
   });
 
@@ -183,13 +190,6 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
       socket.disconnect(true);
       return;
     }
-
-    registerMessageHandlers(socket, {
-      io,
-      messages: deps.messages,
-      limiter,
-      sendRule,
-    });
 
     socket.on("disconnect", (reason) => {
       void (async () => {
