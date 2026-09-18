@@ -4,6 +4,7 @@ import { createAdapter } from "@socket.io/redis-adapter";
 import { Server, type Socket } from "socket.io";
 import {
   ROOM,
+  TIMINGS,
   toId,
   type ClientToServerEvents,
   type ServerToClientEvents,
@@ -76,6 +77,56 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
     void welcome(socket);
   });
 
+  const sweep = setInterval(() => {
+    void refreshPresence();
+  }, TIMINGS.presenceSweepMs);
+
+  sweep.unref();
+
+  async function refreshPresence(): Promise<void> {
+    try {
+      const sockets = await io.local.fetchSockets();
+      if (sockets.length === 0) return;
+
+      const restored = await presence.refresh(
+        sockets.map((socket) => ({
+          userId: socket.data.userId,
+          socketId: socket.id,
+        })),
+      );
+
+      if (restored.length === 0) return;
+
+      const announced = new Set<string>();
+
+      for (const socket of sockets) {
+        const userId = socket.data.userId;
+
+        if (!restored.includes(userId) || announced.has(userId)) continue;
+        announced.add(userId);
+
+        const rooms = [...socket.rooms].filter((room) =>
+          room.startsWith("conv:"),
+        );
+        if (rooms.length === 0) continue;
+
+        io.to(rooms).emit("presence:update", {
+          userId: toId(userId),
+          status: "online",
+          lastSeenAt: null,
+        });
+      }
+
+      logger.warn("presence was lost and has been restored", {
+        users: restored.length,
+      });
+    } catch (error) {
+      logger.error("presence sweep failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   async function welcome(socket: RealtimeSocket): Promise<void> {
     const userId = socket.data.userId;
     let rooms: string[] = [];
@@ -83,14 +134,14 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
     try {
       await socket.join(ROOM.user(userId));
 
+      const firstConnection = await presence.online(userId, socket.id);
+
       const conversationIds = await deps.conversations.idsForUser(
         BigInt(userId),
       );
       rooms = conversationIds.map((id) => ROOM.conversation(id.toString()));
 
       if (rooms.length > 0) await socket.join(rooms);
-
-      const firstConnection = await presence.online(userId, socket.id);
 
       if (firstConnection && rooms.length > 0) {
         socket.to(rooms).emit("presence:update", {
@@ -138,10 +189,6 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
       messages: deps.messages,
       limiter,
       sendRule,
-    });
-
-    socket.on("presence:heartbeat", () => {
-      void presence.heartbeat(userId);
     });
 
     socket.on("disconnect", (reason) => {

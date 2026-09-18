@@ -3,10 +3,15 @@ import { TIMINGS } from "@duplex/shared";
 import { logger } from "../lib/logger.js";
 import type { RedisClients } from "../lib/redis.js";
 
+export interface PresenceEntry {
+  userId: string;
+  socketId: string;
+}
+
 export interface PresenceTracker {
   online(userId: string, socketId: string): Promise<boolean>;
   offline(userId: string, socketId: string): Promise<boolean>;
-  heartbeat(userId: string): Promise<void>;
+  refresh(entries: ReadonlyArray<PresenceEntry>): Promise<string[]>;
   onlineAmong(userIds: string[]): Promise<string[]>;
 }
 
@@ -62,11 +67,31 @@ export function createPresenceTracker(redis: RedisClients): PresenceTracker {
       }
     },
 
-    async heartbeat(userId) {
+    async refresh(entries) {
+      if (entries.length === 0) return [];
+
       try {
-        await redis.commands.expire(keyFor(userId), ttl);
+        const pipeline = redis.commands.multi();
+
+        for (const entry of entries) {
+          pipeline.sadd(keyFor(entry.userId), entry.socketId);
+          pipeline.expire(keyFor(entry.userId), ttl);
+        }
+
+        const results = await pipeline.exec();
+        if (results === null) return [];
+
+        const restored = new Set<string>();
+
+        entries.forEach((entry, index) => {
+          const added = results[index * 2]?.[1];
+          if (typeof added === "number" && added === 1) restored.add(entry.userId);
+        });
+
+        return [...restored];
       } catch (error) {
-        report("heartbeat", error);
+        report("refresh", error);
+        return [];
       }
     },
 
