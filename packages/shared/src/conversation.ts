@@ -53,6 +53,16 @@ export const zCreateGroupBody = z.object({
 });
 export type CreateGroupBody = z.infer<typeof zCreateGroupBody>;
 
+export const zAddMembersBody = z.object({
+  userIds: z.array(zId).min(1).max(LIMITS.groupMembers.max),
+});
+export type AddMembersBody = z.infer<typeof zAddMembersBody>;
+
+export const zTransferOwnerBody = z.object({
+  userId: zId,
+});
+export type TransferOwnerBody = z.infer<typeof zTransferOwnerBody>;
+
 export const zReadAckBody = z.object({
   lastMessageId: zId,
 });

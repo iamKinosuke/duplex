@@ -76,6 +76,9 @@ export const zReadUpdate = z.object({
 });
 export type ReadUpdate = z.infer<typeof zReadUpdate>;
 
+export const zConversationRemoved = z.object({ conversationId: zId });
+export type ConversationRemoved = z.infer<typeof zConversationRemoved>;
+
 export const zMessageDeleted = z.object({
   conversationId: zId,
   messageId: zId,
@@ -128,7 +131,7 @@ export interface ServerToClientEvents {
   "read:update": (payload: ReadUpdate) => void;
   "presence:update": (payload: Presence) => void;
   "conversation:upsert": (conversation: ConversationSummary) => void;
-  "conversation:removed": (payload: { conversationId: string }) => void;
+  "conversation:removed": (payload: ConversationRemoved) => void;
   "call:incoming": (payload: CallIncoming) => void;
   "call:accepted": (payload: CallIdEvent) => void;
   "call:sdp": (payload: CallSdpEvent) => void;
