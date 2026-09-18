@@ -9,8 +9,6 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { TIMINGS } from "@duplex/shared";
-
 import { createSocket, type DuplexSocket } from "./socket";
 
 const SocketContext = createContext<DuplexSocket | null>(null);
@@ -50,12 +48,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     socket.connect();
 
-    const heartbeat = setInterval(() => {
-      if (socket.connected) socket.emit("presence:heartbeat");
-    }, TIMINGS.presenceHeartbeatMs);
-
     return () => {
-      clearInterval(heartbeat);
       socket.disconnect();
     };
   }, [socket]);

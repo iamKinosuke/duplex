@@ -111,7 +111,6 @@ export interface ClientToServerEvents {
   "typing:start": (payload: TypingEvent) => void;
   "typing:stop": (payload: TypingEvent) => void;
   "read:ack": (payload: ReadAckEvent) => void;
-  "presence:heartbeat": () => void;
   "call:invite": (payload: CallInviteEvent, ack: AckFn<{ callId: string }>) => void;
   "call:accept": (payload: CallIdEvent) => void;
   "call:decline": (payload: CallIdEvent) => void;

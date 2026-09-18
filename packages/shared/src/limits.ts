@@ -13,7 +13,7 @@ export const LIMITS = {
 
 export const TIMINGS = {
   presenceTtlSeconds: 30,
-  presenceHeartbeatMs: 15_000,
+  presenceSweepMs: 15_000,
   typingTtlSeconds: 5,
   typingDebounceMs: 300,
   typingThrottleMs: 2_000,
