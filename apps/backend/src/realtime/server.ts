@@ -22,7 +22,7 @@ import type { UserRepository } from "../repositories/user.repository.js";
 import type { MessageService } from "../services/message.service.js";
 import { createHandshakeAuth } from "./auth.js";
 import { registerMessageHandlers } from "./handlers/message.js";
-import { createPresenceTracker } from "./presence.js";
+import type { PresenceTracker } from "./presence.js";
 
 type InterServerEvents = Record<string, never>;
 
@@ -46,6 +46,7 @@ export interface RealtimeServerDeps {
   users: Pick<UserRepository, "existsById" | "touchLastSeen">;
   conversations: Pick<ConversationRepository, "idsForUser" | "peerIdsIn">;
   messages: MessageService;
+  presence: PresenceTracker;
   secret: string;
   frontendOrigin: string;
   adapterKey: string;
@@ -62,7 +63,7 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
     createAdapter(deps.redis.pub, deps.redis.sub, { key: deps.adapterKey }),
   );
 
-  const presence = createPresenceTracker(deps.redis);
+  const presence = deps.presence;
   const limiter = createRateLimiter(deps.redis);
   const sendRule: RateLimitRule = ruleFromWindow(
     deps.sendRateLimit.max,

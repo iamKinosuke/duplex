@@ -6,6 +6,7 @@ import { assertDatabaseReachable, disconnectDatabase, prisma } from "./db/prisma
 import { logger } from "./lib/logger.js";
 import { connectRedis, createRedisClients } from "./lib/redis.js";
 import { createRealtimeBridge } from "./realtime/bridge.js";
+import { createPresenceTracker } from "./realtime/presence.js";
 import { createRealtimeServer } from "./realtime/server.js";
 import { createConversationRepository } from "./repositories/conversation.repository.js";
 import { createMessageRepository } from "./repositories/message.repository.js";
@@ -22,6 +23,7 @@ async function main(): Promise<void> {
   const redis = createRedisClients();
   await connectRedis(redis);
 
+  const presence = createPresenceTracker(redis);
   const bridge = createRealtimeBridge();
 
   const app = createApp({
@@ -38,6 +40,7 @@ async function main(): Promise<void> {
     redis,
     users: createUserRepository(prisma),
     conversations: conversationRepository,
+    presence,
     messages: createMessageService({
       messages: createMessageRepository(prisma),
       conversations: conversationRepository,
@@ -51,7 +54,7 @@ async function main(): Promise<void> {
     },
   });
 
-  bridge.attach(io);
+  bridge.attach(io, presence);
 
   server.listen(env.PORT, () => {
     logger.info("api listening", {

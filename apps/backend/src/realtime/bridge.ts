@@ -1,4 +1,4 @@
-import { ROOM } from "@duplex/shared";
+import { ROOM, toId } from "@duplex/shared";
 
 import { logger } from "../lib/logger.js";
 import type { SessionEvents } from "../services/auth.service.js";
@@ -6,36 +6,56 @@ import type {
   ConversationCreatedEvent,
   ConversationEvents,
 } from "../services/conversation.service.js";
+import type { PresenceTracker } from "./presence.js";
 import type { RealtimeServer } from "./server.js";
 
 export interface RealtimeBridge extends ConversationEvents, SessionEvents {
-  attach(io: RealtimeServer): void;
+  attach(io: RealtimeServer, presence: PresenceTracker): void;
 }
 
 export function createRealtimeBridge(): RealtimeBridge {
   let io: RealtimeServer | null = null;
+  let presence: PresenceTracker | null = null;
 
   return {
-    attach(server) {
+    attach(server, tracker) {
       io = server;
+      presence = tracker;
     },
 
     conversationCreated(event: ConversationCreatedEvent) {
-      if (io === null) return;
+      const server = io;
+      if (server === null) return;
 
       const room = ROOM.conversation(event.conversationId);
 
       for (const viewer of event.viewers) {
         const userRoom = ROOM.user(viewer.userId);
 
-        io.in(userRoom).socketsJoin(room);
-        io.to(userRoom).emit("conversation:upsert", viewer.conversation);
+        server.in(userRoom).socketsJoin(room);
+        server.to(userRoom).emit("conversation:upsert", viewer.conversation);
       }
 
       logger.debug("conversation broadcast", {
         conversationId: event.conversationId,
         viewers: event.viewers.length,
       });
+
+      const tracker = presence;
+      if (tracker === null) return;
+
+      void (async () => {
+        const memberIds = event.viewers.map((viewer) => viewer.userId);
+        const online = await tracker.onlineAmong(memberIds);
+
+        for (const memberId of online) {
+          server.to(room).emit("presence:update", {
+            userId: toId(memberId),
+            status: "online",
+            lastSeenAt: null,
+          });
+        }
+      })();
     },
 
     sessionsRevoked(userId: string) {
