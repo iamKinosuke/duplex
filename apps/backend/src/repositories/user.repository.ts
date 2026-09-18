@@ -50,11 +50,17 @@ export interface UpdateProfileData {
   avatarUrl?: string | null | undefined;
 }
 
+export interface NamedUserRow {
+  id: bigint;
+  displayName: string;
+}
+
 export interface UserRepository {
   create(data: CreateUserData): Promise<UserRecord>;
   findByEmail(email: string): Promise<UserRecord | null>;
   findById(id: bigint): Promise<UserRecord | null>;
   existsById(id: bigint): Promise<boolean>;
+  listNamesByIds(ids: bigint[]): Promise<NamedUserRow[]>;
   updateProfile(id: bigint, data: UpdateProfileData): Promise<UserRecord>;
   search(options: SearchUsersOptions): Promise<PublicUserRow[]>;
   touchLastSeen(id: bigint, at: Date): Promise<void>;
@@ -107,6 +113,15 @@ export function createUserRepository(client: PrismaClient): UserRepository {
         select: { id: true },
       });
       return row !== null;
+    },
+
+    async listNamesByIds(ids) {
+      if (ids.length === 0) return [];
+
+      return await client.user.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, displayName: true },
+      });
     },
 
     async updateProfile(id, data) {

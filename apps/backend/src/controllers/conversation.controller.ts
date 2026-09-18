@@ -1,7 +1,10 @@
 import type { Request, RequestHandler } from "express";
 import {
+  zAddMembersBody,
   zCreateDirectBody,
+  zCreateGroupBody,
   zId,
+  zTransferOwnerBody,
   zMessagePageQuery,
   type ConversationList,
   type MessagePage,
@@ -19,6 +22,10 @@ export interface ConversationControllerDeps {
 
 function conversationIdOf(req: Request): bigint {
   return toBigInt(zId.parse(req.params["id"]));
+}
+
+function memberIdOf(req: Request): bigint {
+  return toBigInt(zId.parse(req.params["userId"]));
 }
 
 export function createConversationController(deps: ConversationControllerDeps) {
@@ -51,6 +58,63 @@ export function createConversationController(deps: ConversationControllerDeps) {
     res.status(result.created ? 201 : 200).json(result.conversation);
   };
 
+  const createGroup: RequestHandler = async (req, res) => {
+    const user = currentUser(req);
+    const body = zCreateGroupBody.parse(req.body);
+
+    const conversation = await deps.conversations.createGroup({
+      ownerId: user.id,
+      name: body.name,
+      avatarUrl: body.avatarUrl ?? null,
+      memberIds: body.memberIds.map(toBigInt),
+    });
+
+    res.status(201).json(conversation);
+  };
+
+  const addMembers: RequestHandler = async (req, res) => {
+    const user = currentUser(req);
+    const body = zAddMembersBody.parse(req.body);
+
+    const conversation = await deps.conversations.addMembers({
+      conversationId: conversationIdOf(req),
+      actorId: user.id,
+      memberIds: body.userIds.map(toBigInt),
+    });
+
+    res.status(200).json(conversation);
+  };
+
+  const removeMember: RequestHandler = async (req, res) => {
+    const user = currentUser(req);
+
+    const conversation = await deps.conversations.removeMember({
+      conversationId: conversationIdOf(req),
+      actorId: user.id,
+      memberId: memberIdOf(req),
+    });
+
+    if (conversation === null) {
+      res.status(204).end();
+      return;
+    }
+
+    res.status(200).json(conversation);
+  };
+
+  const transferOwner: RequestHandler = async (req, res) => {
+    const user = currentUser(req);
+    const body = zTransferOwnerBody.parse(req.body);
+
+    const conversation = await deps.conversations.transferOwner({
+      conversationId: conversationIdOf(req),
+      actorId: user.id,
+      nextOwnerId: toBigInt(body.userId),
+    });
+
+    res.status(200).json(conversation);
+  };
+
   const messages: RequestHandler = async (req, res) => {
     const user = currentUser(req);
     const query = zMessagePageQuery.parse(req.query);
@@ -67,5 +131,14 @@ export function createConversationController(deps: ConversationControllerDeps) {
     res.status(200).json(payload);
   };
 
-  return { list, detail, openDirect, messages };
+  return {
+    list,
+    detail,
+    openDirect,
+    createGroup,
+    addMembers,
+    removeMember,
+    transferOwner,
+    messages,
+  };
 }

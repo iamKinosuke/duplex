@@ -18,8 +18,16 @@ export function createConversationRouter(deps: ConversationRouterDeps): Router {
 
   router.get("/", deps.readRateLimit, deps.controller.list);
   router.post("/direct", deps.writeRateLimit, deps.controller.openDirect);
+  router.post("/group", deps.writeRateLimit, deps.controller.createGroup);
   router.get("/:id", deps.readRateLimit, deps.controller.detail);
   router.get("/:id/messages", deps.readRateLimit, deps.controller.messages);
+  router.post("/:id/members", deps.writeRateLimit, deps.controller.addMembers);
+  router.delete(
+    "/:id/members/:userId",
+    deps.writeRateLimit,
+    deps.controller.removeMember,
+  );
+  router.post("/:id/owner", deps.writeRateLimit, deps.controller.transferOwner);
 
   return router;
 }
