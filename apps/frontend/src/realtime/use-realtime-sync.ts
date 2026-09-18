@@ -2,11 +2,24 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
-import type { ConversationSummary, Message, Presence } from "@duplex/shared";
+import { usePathname, useRouter } from "next/navigation";
+import type {
+  ConversationRemoved,
+  ConversationSummary,
+  Message,
+  Presence,
+} from "@duplex/shared";
 
-import { conversationKeys, upsertConversation } from "@/features/conversation/queries";
-import { appendMessage, dropPending } from "@/features/message/queries";
+import {
+  conversationKeys,
+  removeConversation,
+  upsertConversation,
+} from "@/features/conversation/queries";
+import {
+  appendMessage,
+  dropPending,
+  messageKeys,
+} from "@/features/message/queries";
 import { applyPresence } from "@/features/presence/queries";
 import { useSession } from "@/features/auth/session";
 import { useSocket } from "./socket-provider";
@@ -20,6 +33,7 @@ export function useRealtimeSync(): void {
   const socket = useSocket();
   const client = useQueryClient();
   const pathname = usePathname();
+  const router = useRouter();
   const session = useSession();
 
   const myId = session.data?.id ?? null;
@@ -34,6 +48,7 @@ export function useRealtimeSync(): void {
 
       const mine = myId !== null && message.senderId === myId;
       const reading = activeId === message.conversationId;
+      const counts = !mine && !reading && message.type !== "system";
 
       client.setQueryData<ConversationSummary[]>(
         conversationKeys.all,
@@ -49,8 +64,7 @@ export function useRealtimeSync(): void {
             ...target,
             lastMessage: message,
             updatedAt: message.createdAt,
-            unreadCount:
-              mine || reading ? target.unreadCount : target.unreadCount + 1,
+            unreadCount: counts ? target.unreadCount + 1 : target.unreadCount,
           };
 
           return [
@@ -69,14 +83,24 @@ export function useRealtimeSync(): void {
       applyPresence(client, update);
     }
 
+    function onRemoved({ conversationId }: ConversationRemoved): void {
+      removeConversation(client, conversationId);
+      client.removeQueries({ queryKey: messageKeys.history(conversationId) });
+      client.removeQueries({ queryKey: messageKeys.pending(conversationId) });
+
+      if (activeId === conversationId) router.replace("/");
+    }
+
     socket.on("message:new", onMessage);
     socket.on("conversation:upsert", onConversation);
     socket.on("presence:update", onPresence);
+    socket.on("conversation:removed", onRemoved);
 
     return () => {
       socket.off("message:new", onMessage);
       socket.off("conversation:upsert", onConversation);
       socket.off("presence:update", onPresence);
+      socket.off("conversation:removed", onRemoved);
     };
-  }, [socket, client, myId, activeId]);
+  }, [socket, client, router, myId, activeId]);
 }

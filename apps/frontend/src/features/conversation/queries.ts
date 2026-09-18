@@ -83,6 +83,17 @@ export function useOpenDirect() {
   });
 }
 
+export function removeConversation(
+  client: QueryClient,
+  conversationId: string,
+): void {
+  client.setQueryData<ConversationSummary[]>(conversationKeys.all, (current) =>
+    (current ?? []).filter((item) => item.id !== conversationId),
+  );
+
+  client.removeQueries({ queryKey: conversationKeys.detail(conversationId) });
+}
+
 export function upsertConversation(
   client: QueryClient,
   conversation: ConversationSummary,
