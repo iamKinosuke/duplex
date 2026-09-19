@@ -16,6 +16,9 @@ import {
 } from "@/features/message/queries";
 import { useMarkRead } from "@/features/message/use-mark-read";
 import { useIsOnline } from "@/features/presence/queries";
+import { useTypingIn } from "@/features/typing/queries";
+import { TypingLine } from "@/features/typing/typing-line";
+import { useTypingSignal } from "@/features/typing/use-typing-signal";
 import { useConversation } from "./queries";
 
 export function ConversationView({ conversationId }: { conversationId: string }) {
@@ -31,7 +34,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const online = useIsOnline(peer?.id);
   const myId = session.data?.id ?? null;
 
+  const typing = useTypingSignal(conversationId);
+  const typists = useTypingIn(conversationId, myId);
+
   function submit(body: string) {
+    typing.onSent();
     send.mutate({ clientMsgId: randomUUID(), body });
   }
 
@@ -95,7 +102,13 @@ export function ConversationView({ conversationId }: { conversationId: string })
         />
       )}
 
-      <Composer onSend={submit} disabled={conversation.isPending} />
+      <TypingLine conversation={conversation.data ?? null} userIds={typists} />
+
+      <Composer
+        onSend={submit}
+        onType={typing.onInput}
+        disabled={conversation.isPending}
+      />
     </div>
   );
 }

@@ -9,9 +9,11 @@ import { useSocketConnected } from "@/realtime/socket-provider";
 
 export function Composer({
   onSend,
+  onType,
   disabled,
 }: {
   onSend: (body: string) => void;
+  onType?: () => void;
   disabled?: boolean;
 }) {
   const [draft, setDraft] = useState("");
@@ -42,7 +44,10 @@ export function Composer({
       <div className="flex items-end gap-2">
         <textarea
           value={draft}
-          onChange={(event) => setDraft(event.target.value.slice(0, LIMITS.messageBody.max))}
+          onChange={(event) => {
+            setDraft(event.target.value.slice(0, LIMITS.messageBody.max));
+            onType?.();
+          }}
           onKeyDown={onKeyDown}
           rows={1}
           disabled={disabled}
