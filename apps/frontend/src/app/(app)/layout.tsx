@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 
 import { RequireSession } from "@/features/auth/auth-gate";
 import { useSession } from "@/features/auth/session";
+import { ConversationPanel } from "@/features/conversation/conversation-panel";
+import { openConversationId } from "@/features/conversation/route";
 import { AppShell } from "@/features/shell/app-shell";
 import { InfoPanel } from "@/features/shell/info-panel";
 import { Sidebar } from "@/features/shell/sidebar";
@@ -29,12 +31,20 @@ function Shell({ children }: { children: ReactNode }) {
 
   if (session.data == null) return null;
 
+  const openId = openConversationId(pathname);
+
   return (
     <AppShell
       detailOpen={pathname !== "/"}
       sidebar={<Sidebar me={session.data} />}
       detail={children}
-      panel={<InfoPanel me={session.data} />}
+      panel={
+        openId === null ? (
+          <InfoPanel me={session.data} />
+        ) : (
+          <ConversationPanel conversationId={openId} />
+        )
+      }
     />
   );
 }
