@@ -18,6 +18,7 @@ import {
   removeConversation,
   upsertConversation,
 } from "@/features/conversation/queries";
+import { openConversationId } from "@/features/conversation/route";
 import {
   appendMessage,
   dropPending,
@@ -27,11 +28,6 @@ import { applyPresence } from "@/features/presence/queries";
 import { applyTyping, clearTyping } from "@/features/typing/queries";
 import { useSession } from "@/features/auth/session";
 import { useSocket } from "./socket-provider";
-
-function openConversationId(pathname: string): string | null {
-  const match = /^\/c\/(\d+)/u.exec(pathname);
-  return match?.[1] ?? null;
-}
 
 export function useRealtimeSync(): void {
   const socket = useSocket();
