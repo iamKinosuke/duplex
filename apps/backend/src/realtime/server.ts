@@ -23,9 +23,14 @@ import type { UserRepository } from "../repositories/user.repository.js";
 import type { MessageService } from "../services/message.service.js";
 import { createHandshakeAuth } from "./auth.js";
 import { registerMessageHandlers } from "./handlers/message.js";
+import { registerTypingHandlers } from "./handlers/typing.js";
 import type { PresenceTracker } from "./presence.js";
+import { createTypingTracker } from "./typing.js";
 
 type InterServerEvents = Record<string, never>;
+
+const TYPING_EVENTS_MAX = 15;
+const TYPING_EVENTS_WINDOW_MS = 10_000;
 
 export type RealtimeServer = Server<
   ClientToServerEvents,
@@ -65,10 +70,15 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
   );
 
   const presence = deps.presence;
+  const typing = createTypingTracker(deps.redis);
   const limiter = createRateLimiter(deps.redis);
   const sendRule: RateLimitRule = ruleFromWindow(
     deps.sendRateLimit.max,
     deps.sendRateLimit.windowMs,
+  );
+  const typingRule: RateLimitRule = ruleFromWindow(
+    TYPING_EVENTS_MAX,
+    TYPING_EVENTS_WINDOW_MS,
   );
 
   io.use(createHandshakeAuth({ secret: deps.secret, users: deps.users }));
@@ -77,9 +87,12 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
     registerMessageHandlers(socket, {
       io,
       messages: deps.messages,
+      typing,
       limiter,
       sendRule,
     });
+
+    registerTypingHandlers(socket, { io, typing, limiter, typingRule });
 
     void welcome(socket);
   });

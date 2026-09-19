@@ -13,10 +13,12 @@ import type { MessageService } from "../../services/message.service.js";
 import { toBigInt } from "../../utils/serialize.js";
 import { failure, success } from "../ack.js";
 import type { RealtimeServer, RealtimeSocket } from "../server.js";
+import type { TypingTracker } from "../typing.js";
 
 export interface MessageHandlerDeps {
   io: RealtimeServer;
   messages: MessageService;
+  typing: TypingTracker;
   limiter: RateLimiter;
   sendRule: RateLimitRule;
 }
@@ -60,9 +62,21 @@ export function registerMessageHandlers(
         });
 
         if (result.created) {
-          deps.io
-            .to(ROOM.conversation(event.conversationId))
-            .emit("message:new", result.message);
+          const room = ROOM.conversation(event.conversationId);
+
+          deps.io.to(room).emit("message:new", result.message);
+
+          const stillTyping = await deps.typing.clear(
+            event.conversationId,
+            userId,
+          );
+
+          if (stillTyping !== null) {
+            deps.io.to(room).emit("typing:update", {
+              conversationId: event.conversationId,
+              userIds: stillTyping.map(toId),
+            });
+          }
         }
 
         ack(success(result.message));
