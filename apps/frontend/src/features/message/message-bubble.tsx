@@ -1,7 +1,7 @@
 "use client";
 
 import type { Message } from "@duplex/shared";
-import { Check, Loader2, RotateCcw, TriangleAlert } from "lucide-react";
+import { Loader2, RotateCcw, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -47,7 +47,6 @@ export function MessageBubble({
 
         <span className="mt-0.5 flex items-center justify-end gap-1 text-2xs opacity-70">
           {clockOf(message.createdAt)}
-          {mine ? <Check className="size-3" /> : null}
         </span>
       </div>
     </div>
