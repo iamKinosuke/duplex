@@ -1,9 +1,10 @@
 "use client";
 
-import type { Message } from "@duplex/shared";
+import type { Message, User } from "@duplex/shared";
 import { Loader2, RotateCcw, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 import type { PendingMessage } from "./queries";
 
@@ -14,19 +15,43 @@ function clockOf(iso: string): string {
   });
 }
 
+export function SystemMessage({ message }: { message: Message }) {
+  return (
+    <p className="flex justify-center py-1">
+      <span className="rounded-full border-2 border-hairline bg-surface-raised px-3 py-1 text-center text-2xs text-muted-foreground">
+        {message.body}
+      </span>
+    </p>
+  );
+}
+
 export function MessageBubble({
   message,
   mine,
   showTail,
+  senderName,
+  avatar,
+  gutter = false,
 }: {
   message: Message;
   mine: boolean;
   showTail: boolean;
+  senderName?: string | null;
+  avatar?: Pick<User, "displayName" | "avatarUrl"> | null;
+  gutter?: boolean;
 }) {
   const deleted = message.deletedAt !== null;
 
   return (
-    <div className={cn("flex", mine ? "justify-end" : "justify-start")}>
+    <div className={cn("flex items-end gap-2", mine ? "justify-end" : "justify-start")}>
+      {gutter && !mine ? (
+        <span className="w-8 shrink-0">
+          {avatar != null ? (
+            <UserAvatar user={avatar} className="size-8 rounded-lg" />
+          ) : null}
+        </span>
+      ) : null}
+
       <div
         className={cn(
           "max-w-[min(32rem,78%)] rounded-bubble border-2 border-ink px-3.5 py-2 shadow-sticker-sm",
@@ -36,6 +61,12 @@ export function MessageBubble({
           showTail && (mine ? "rounded-br-md" : "rounded-bl-md"),
         )}
       >
+        {senderName != null ? (
+          <p className="mb-0.5 font-display text-2xs font-semibold opacity-70">
+            {senderName}
+          </p>
+        ) : null}
+
         <p
           className={cn(
             "break-words whitespace-pre-wrap",

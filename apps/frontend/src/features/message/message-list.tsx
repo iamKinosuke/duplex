@@ -6,7 +6,9 @@ import { Fragment, useEffect, useLayoutEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MessageBubble, PendingBubble } from "./message-bubble";
+import { useConversation } from "@/features/conversation/queries";
+import { MessageBubble, PendingBubble, SystemMessage } from "./message-bubble";
+import { metaFor } from "./message-meta";
 import { receiptLabel } from "./read-receipt";
 import { useReadReceipt } from "./use-read-receipt";
 import {
@@ -26,6 +28,7 @@ export function MessageList({
 }) {
   const history = useMessageHistory(conversationId);
   const pending = usePendingMessages(conversationId);
+  const conversation = useConversation(conversationId);
 
   const scroller = useRef<HTMLDivElement>(null);
   const anchorHeight = useRef<number | null>(null);
@@ -116,16 +119,34 @@ export function MessageList({
 
       <div className="space-y-1.5">
         {messages.map((message, index) => {
-          const next = messages[index + 1];
-          const lastOfRun = next === undefined || next.senderId !== message.senderId;
+          const meta = metaFor(
+            messages,
+            index,
+            myId,
+            conversation.data ?? null,
+          );
+
+          if (meta === null) return null;
+
+          const sender =
+            conversation.data?.members.find(
+              (member) => member.user.id === message.senderId,
+            )?.user ?? null;
 
           return (
             <Fragment key={message.id}>
-              <MessageBubble
-                message={message}
-                mine={message.senderId === myId}
-                showTail={lastOfRun}
-              />
+              {meta.kind === "system" ? (
+                <SystemMessage message={message} />
+              ) : (
+                <MessageBubble
+                  message={message}
+                  mine={meta.mine}
+                  showTail={meta.endsRun}
+                  senderName={meta.senderName}
+                  avatar={meta.endsRun ? sender : null}
+                  gutter={conversation.data?.type === "group"}
+                />
+              )}
 
               {message.id === lastMine && receipt !== null ? (
                 <p className="pt-0.5 pr-1 text-right text-2xs text-muted-foreground">
