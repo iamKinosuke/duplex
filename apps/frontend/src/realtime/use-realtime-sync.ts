@@ -8,10 +8,12 @@ import type {
   ConversationSummary,
   Message,
   Presence,
+  ReadUpdate,
   TypingUpdate,
 } from "@duplex/shared";
 
 import {
+  advanceReadCursor,
   conversationKeys,
   removeConversation,
   upsertConversation,
@@ -48,6 +50,12 @@ export function useRealtimeSync(): void {
       appendMessage(client, message.conversationId, message);
       dropPending(client, message.conversationId, message.clientMsgId);
       clearTyping(client, message.conversationId, message.senderId);
+      advanceReadCursor(
+        client,
+        message.conversationId,
+        message.senderId,
+        message.id,
+      );
 
       const mine = myId !== null && message.senderId === myId;
       const reading = activeId === message.conversationId;
@@ -90,6 +98,15 @@ export function useRealtimeSync(): void {
       applyTyping(client, update);
     }
 
+    function onRead(update: ReadUpdate): void {
+      advanceReadCursor(
+        client,
+        update.conversationId,
+        update.userId,
+        update.lastMessageId,
+      );
+    }
+
     function onRemoved({ conversationId }: ConversationRemoved): void {
       removeConversation(client, conversationId);
       client.removeQueries({ queryKey: messageKeys.history(conversationId) });
@@ -102,6 +119,7 @@ export function useRealtimeSync(): void {
     socket.on("conversation:upsert", onConversation);
     socket.on("presence:update", onPresence);
     socket.on("typing:update", onTyping);
+    socket.on("read:update", onRead);
     socket.on("conversation:removed", onRemoved);
 
     return () => {
@@ -109,6 +127,7 @@ export function useRealtimeSync(): void {
       socket.off("conversation:upsert", onConversation);
       socket.off("presence:update", onPresence);
       socket.off("typing:update", onTyping);
+      socket.off("read:update", onRead);
       socket.off("conversation:removed", onRemoved);
     };
   }, [socket, client, router, myId, activeId]);

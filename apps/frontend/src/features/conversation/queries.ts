@@ -8,6 +8,7 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 import {
+  toId,
   zConversationDetail,
   zConversationList,
   zUserList,
@@ -81,6 +82,35 @@ export function useOpenDirect() {
       upsertConversation(client, conversation);
     },
   });
+}
+
+export function advanceReadCursor(
+  client: QueryClient,
+  conversationId: string,
+  userId: string,
+  lastMessageId: string,
+): void {
+  client.setQueryData<ConversationDetail>(
+    conversationKeys.detail(conversationId),
+    (current) => {
+      if (current === undefined) return current;
+
+      const index = current.members.findIndex(
+        (member) => member.user.id === userId,
+      );
+      const member = index === -1 ? undefined : current.members[index];
+
+      if (member === undefined) return current;
+      if (BigInt(member.lastReadMessageId) >= BigInt(lastMessageId)) {
+        return current;
+      }
+
+      const members = [...current.members];
+      members[index] = { ...member, lastReadMessageId: toId(lastMessageId) };
+
+      return { ...current, members };
+    },
+  );
 }
 
 export function removeConversation(
