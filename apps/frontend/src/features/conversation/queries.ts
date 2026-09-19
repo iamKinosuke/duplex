@@ -84,6 +84,83 @@ export function useOpenDirect() {
   });
 }
 
+export function useCreateGroup() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: { name: string; memberIds: string[] }) =>
+      apiFetch({
+        path: "/api/conversations/group",
+        method: "POST",
+        body,
+        schema: zConversationDetail,
+      }),
+    onSuccess: (conversation) => keepDetail(client, conversation),
+  });
+}
+
+export function useAddMembers(conversationId: string) {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userIds: string[]) =>
+      apiFetch({
+        path: `/api/conversations/${conversationId}/members`,
+        method: "POST",
+        body: { userIds },
+        schema: zConversationDetail,
+      }),
+    onSuccess: (conversation) => keepDetail(client, conversation),
+  });
+}
+
+export function useRemoveMember(conversationId: string) {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userId: string) =>
+      apiFetch({
+        path: `/api/conversations/${conversationId}/members/${userId}`,
+        method: "DELETE",
+        schema: zConversationDetail,
+      }),
+    onSuccess: (conversation) => keepDetail(client, conversation),
+  });
+}
+
+export function useTransferOwner(conversationId: string) {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userId: string) =>
+      apiFetch({
+        path: `/api/conversations/${conversationId}/owner`,
+        method: "POST",
+        body: { userId },
+        schema: zConversationDetail,
+      }),
+    onSuccess: (conversation) => keepDetail(client, conversation),
+  });
+}
+
+export function useLeaveConversation(conversationId: string) {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: (myId: string) =>
+      apiFetch<void>({
+        path: `/api/conversations/${conversationId}/members/${myId}`,
+        method: "DELETE",
+      }),
+    onSuccess: () => removeConversation(client, conversationId),
+  });
+}
+
+function keepDetail(client: QueryClient, conversation: ConversationDetail): void {
+  client.setQueryData(conversationKeys.detail(conversation.id), conversation);
+  upsertConversation(client, conversation);
+}
+
 export function advanceReadCursor(
   client: QueryClient,
   conversationId: string,
