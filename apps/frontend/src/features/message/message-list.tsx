@@ -2,11 +2,13 @@
 
 import type { Message } from "@duplex/shared";
 import { Loader2 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageBubble, PendingBubble } from "./message-bubble";
+import { receiptLabel } from "./read-receipt";
+import { useReadReceipt } from "./use-read-receipt";
 import {
   useMessageHistory,
   usePendingMessages,
@@ -35,6 +37,13 @@ export function MessageList({
 
   const newest = messages.at(-1)?.id ?? null;
   const pendingCount = pending.length;
+
+  let lastMine: string | null = null;
+  for (const message of messages) {
+    if (message.senderId === myId) lastMine = message.id;
+  }
+
+  const receipt = useReadReceipt(conversationId, myId, lastMine);
 
   useLayoutEffect(() => {
     const node = scroller.current;
@@ -111,12 +120,19 @@ export function MessageList({
           const lastOfRun = next === undefined || next.senderId !== message.senderId;
 
           return (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              mine={message.senderId === myId}
-              showTail={lastOfRun}
-            />
+            <Fragment key={message.id}>
+              <MessageBubble
+                message={message}
+                mine={message.senderId === myId}
+                showTail={lastOfRun}
+              />
+
+              {message.id === lastMine && receipt !== null ? (
+                <p className="pt-0.5 pr-1 text-right text-2xs text-muted-foreground">
+                  {receiptLabel(receipt)}
+                </p>
+              ) : null}
+            </Fragment>
           );
         })}
 
