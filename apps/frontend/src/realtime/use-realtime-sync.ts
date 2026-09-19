@@ -8,6 +8,7 @@ import type {
   ConversationSummary,
   Message,
   Presence,
+  TypingUpdate,
 } from "@duplex/shared";
 
 import {
@@ -21,6 +22,7 @@ import {
   messageKeys,
 } from "@/features/message/queries";
 import { applyPresence } from "@/features/presence/queries";
+import { applyTyping, clearTyping } from "@/features/typing/queries";
 import { useSession } from "@/features/auth/session";
 import { useSocket } from "./socket-provider";
 
@@ -45,6 +47,7 @@ export function useRealtimeSync(): void {
     function onMessage(message: Message): void {
       appendMessage(client, message.conversationId, message);
       dropPending(client, message.conversationId, message.clientMsgId);
+      clearTyping(client, message.conversationId, message.senderId);
 
       const mine = myId !== null && message.senderId === myId;
       const reading = activeId === message.conversationId;
@@ -83,6 +86,10 @@ export function useRealtimeSync(): void {
       applyPresence(client, update);
     }
 
+    function onTyping(update: TypingUpdate): void {
+      applyTyping(client, update);
+    }
+
     function onRemoved({ conversationId }: ConversationRemoved): void {
       removeConversation(client, conversationId);
       client.removeQueries({ queryKey: messageKeys.history(conversationId) });
@@ -94,12 +101,14 @@ export function useRealtimeSync(): void {
     socket.on("message:new", onMessage);
     socket.on("conversation:upsert", onConversation);
     socket.on("presence:update", onPresence);
+    socket.on("typing:update", onTyping);
     socket.on("conversation:removed", onRemoved);
 
     return () => {
       socket.off("message:new", onMessage);
       socket.off("conversation:upsert", onConversation);
       socket.off("presence:update", onPresence);
+      socket.off("typing:update", onTyping);
       socket.off("conversation:removed", onRemoved);
     };
   }, [socket, client, router, myId, activeId]);
