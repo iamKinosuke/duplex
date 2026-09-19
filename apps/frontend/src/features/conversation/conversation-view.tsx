@@ -1,10 +1,17 @@
 "use client";
 
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Info, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { randomUUID } from "@/lib/uuid";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { UserAvatar } from "@/components/user-avatar";
 import { useSession } from "@/features/auth/session";
 import { MessageList } from "@/features/message/message-list";
@@ -19,6 +26,7 @@ import { useIsOnline } from "@/features/presence/queries";
 import { useTypingIn } from "@/features/typing/queries";
 import { TypingLine } from "@/features/typing/typing-line";
 import { useTypingSignal } from "@/features/typing/use-typing-signal";
+import { ConversationPanel } from "./conversation-panel";
 import { useConversation } from "./queries";
 
 export function ConversationView({ conversationId }: { conversationId: string }) {
@@ -33,6 +41,8 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const peer = conversation.data?.peer ?? null;
   const online = useIsOnline(peer?.id);
   const myId = session.data?.id ?? null;
+
+  const [details, setDetails] = useState(false);
 
   const typing = useTypingSignal(conversationId);
   const typists = useTypingIn(conversationId, myId);
@@ -62,6 +72,13 @@ export function ConversationView({ conversationId }: { conversationId: string })
   }
 
   const title = peer?.displayName ?? conversation.data?.name ?? "Conversation";
+  const group = conversation.data?.type === "group";
+
+  const subtitle = group
+    ? `${conversation.data?.memberCount ?? 0} members`
+    : online
+      ? "online"
+      : "offline";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -78,21 +95,46 @@ export function ConversationView({ conversationId }: { conversationId: string })
         ) : (
           <>
             <UserAvatar
-              user={peer ?? { displayName: title, avatarUrl: null }}
+              user={
+                peer ?? {
+                  displayName: title,
+                  avatarUrl: conversation.data?.avatarUrl ?? null,
+                }
+              }
               className="size-9"
-              online={online}
+              online={group ? undefined : online}
             />
             <div className="min-w-0">
               <p className="truncate font-display text-sm font-semibold">
                 {title}
               </p>
               <p className="truncate text-2xs text-muted-foreground">
-                {online ? "online" : "offline"}
+                {subtitle}
               </p>
             </div>
+
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="ml-auto xl:hidden"
+              onClick={() => setDetails(true)}
+            >
+              <Info className="size-4" />
+              <span className="sr-only">Conversation details</span>
+            </Button>
           </>
         )}
       </header>
+
+      <Dialog open={details} onOpenChange={setDetails}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto rounded-2xl border-2 border-ink p-0 shadow-sticker-lg sm:max-w-md">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Conversation details</DialogTitle>
+          </DialogHeader>
+
+          <ConversationPanel conversationId={conversationId} />
+        </DialogContent>
+      </Dialog>
 
       {myId === null ? null : (
         <MessageList
