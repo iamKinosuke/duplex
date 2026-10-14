@@ -21,6 +21,7 @@ export interface MessageHandlerDeps {
   typing: TypingTracker;
   limiter: RateLimiter;
   sendRule: RateLimitRule;
+  mutateRule: RateLimitRule;
 }
 
 export function registerMessageHandlers(
@@ -78,6 +79,99 @@ export function registerMessageHandlers(
             });
           }
         }
+
+        ack(success(result.message));
+      } catch (error) {
+        ack(failure(error));
+      }
+    })();
+  });
+
+  async function guard(): Promise<void> {
+    const allowed = await deps.limiter.consume(
+      `rl:socket:mutate:${userId}`,
+      deps.mutateRule,
+    );
+
+    if (!allowed.allowed) {
+      throw AppError.rateLimited("You are changing messages too fast.");
+    }
+  }
+
+  socket.on("message:edit", (payload, ack: AckFn<Message>) => {
+    void (async () => {
+      try {
+        await guard();
+
+        const event = CLIENT_EVENT_SCHEMAS["message:edit"].parse(payload);
+
+        const result = await deps.messages.edit({
+          messageId: toBigInt(event.messageId),
+          userId: toBigInt(userId),
+          body: event.body,
+        });
+
+        deps.io
+          .to(ROOM.conversation(result.edited.conversationId))
+          .emit("message:updated", result.edited);
+
+        ack(success(result.message));
+      } catch (error) {
+        ack(failure(error));
+      }
+    })();
+  });
+
+  socket.on("message:delete", (payload, ack: AckFn<null>) => {
+    void (async () => {
+      try {
+        await guard();
+
+        const event = CLIENT_EVENT_SCHEMAS["message:delete"].parse(payload);
+
+        const result = await deps.messages.remove({
+          messageId: toBigInt(event.messageId),
+          userId: toBigInt(userId),
+        });
+
+        if (result.changed) {
+          deps.io.to(ROOM.conversation(result.conversationId)).emit(
+            "message:deleted",
+            {
+              conversationId: toId(result.conversationId),
+              messageId: toId(result.messageId),
+              deletedAt: result.deletedAt,
+            },
+          );
+        }
+
+        ack(success(null));
+      } catch (error) {
+        ack(failure(error));
+      }
+    })();
+  });
+
+  socket.on("reaction:toggle", (payload, ack: AckFn<Message>) => {
+    void (async () => {
+      try {
+        await guard();
+
+        const event = CLIENT_EVENT_SCHEMAS["reaction:toggle"].parse(payload);
+
+        const result = await deps.messages.react({
+          messageId: toBigInt(event.messageId),
+          userId: toBigInt(userId),
+          emoji: event.emoji,
+        });
+
+        deps.io
+          .to(ROOM.conversation(result.conversationId))
+          .emit("reaction:updated", {
+            conversationId: toId(result.conversationId),
+            messageId: toId(result.message.id),
+            reactions: result.reactions,
+          });
 
         ack(success(result.message));
       } catch (error) {

@@ -320,7 +320,7 @@ export function createConversationService(
           conversationId: conversationId.toString(),
           viewers,
           joined: wanted.map((memberId) => memberId.toString()),
-          systemMessage: toMessage(result.systemMessage),
+          systemMessage: toMessage(result.systemMessage, actorId),
         });
       }
 
@@ -372,7 +372,7 @@ export function createConversationService(
           conversationId: conversationId.toString(),
           viewers,
           removed: memberId.toString(),
-          systemMessage: toMessage(result.systemMessage),
+          systemMessage: toMessage(result.systemMessage, actorId),
         });
       }
 
@@ -413,7 +413,7 @@ export function createConversationService(
         deps.events.ownerTransferred({
           conversationId: conversationId.toString(),
           viewers,
-          systemMessage: toMessage(result.systemMessage),
+          systemMessage: toMessage(result.systemMessage, actorId),
         });
       }
 

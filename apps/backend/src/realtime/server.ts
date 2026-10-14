@@ -32,6 +32,9 @@ type InterServerEvents = Record<string, never>;
 const TYPING_EVENTS_MAX = 15;
 const TYPING_EVENTS_WINDOW_MS = 10_000;
 
+const MUTATE_EVENTS_MAX = 30;
+const MUTATE_EVENTS_WINDOW_MS = 10_000;
+
 export type RealtimeServer = Server<
   ClientToServerEvents,
   ServerToClientEvents,
@@ -80,6 +83,10 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
     TYPING_EVENTS_MAX,
     TYPING_EVENTS_WINDOW_MS,
   );
+  const mutateRule: RateLimitRule = ruleFromWindow(
+    MUTATE_EVENTS_MAX,
+    MUTATE_EVENTS_WINDOW_MS,
+  );
 
   io.use(createHandshakeAuth({ secret: deps.secret, users: deps.users }));
 
@@ -90,6 +97,7 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
       typing,
       limiter,
       sendRule,
+      mutateRule,
     });
 
     registerTypingHandlers(socket, { io, typing, limiter, typingRule });
