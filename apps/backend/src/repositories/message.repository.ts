@@ -15,7 +15,31 @@ export const messageSelect = {
   editedAt: true,
   deletedAt: true,
   createdAt: true,
+  replyTo: {
+    select: {
+      id: true,
+      senderId: true,
+      body: true,
+      deletedAt: true,
+    },
+  },
+  reactions: {
+    select: { userId: true, emoji: true },
+    orderBy: [{ createdAt: "asc" }],
+  },
 } satisfies Prisma.MessageSelect;
+
+const actorSelect = {
+  id: true,
+  conversationId: true,
+  senderId: true,
+  type: true,
+  deletedAt: true,
+} satisfies Prisma.MessageSelect;
+
+export type MessageActorRow = Prisma.MessageGetPayload<{
+  select: typeof actorSelect;
+}>;
 
 export type MessageRow = Prisma.MessageGetPayload<{
   select: typeof messageSelect;
@@ -56,6 +80,14 @@ export interface MessageRepository {
     messageId: bigint,
     conversationId: bigint,
   ): Promise<boolean>;
+  findForActor(messageId: bigint): Promise<MessageActorRow | null>;
+  updateBody(messageId: bigint, body: string, at: Date): Promise<MessageRow>;
+  softDelete(messageId: bigint, at: Date): Promise<MessageRow>;
+  toggleReaction(
+    messageId: bigint,
+    userId: bigint,
+    emoji: string,
+  ): Promise<MessageRow>;
 }
 
 export function createMessageRepository(client: PrismaClient): MessageRepository {
@@ -138,6 +170,47 @@ export function createMessageRepository(client: PrismaClient): MessageRepository
       });
 
       return row !== null;
+    },
+
+    async findForActor(messageId) {
+      return await client.message.findUnique({
+        where: { id: messageId },
+        select: actorSelect,
+      });
+    },
+
+    async updateBody(messageId, body, at) {
+      return await client.message.update({
+        where: { id: messageId },
+        data: { body, editedAt: at },
+        select: messageSelect,
+      });
+    },
+
+    async softDelete(messageId, at) {
+      return await client.message.update({
+        where: { id: messageId },
+        data: { deletedAt: at },
+        select: messageSelect,
+      });
+    },
+
+    async toggleReaction(messageId, userId, emoji) {
+      return await client.$transaction(async (tx) => {
+        const key = { messageId_userId_emoji: { messageId, userId, emoji } };
+        const existing = await tx.reaction.findUnique({ where: key });
+
+        if (existing === null) {
+          await tx.reaction.create({ data: { messageId, userId, emoji } });
+        } else {
+          await tx.reaction.delete({ where: key });
+        }
+
+        return await tx.message.findUniqueOrThrow({
+          where: { id: messageId },
+          select: messageSelect,
+        });
+      });
     },
   };
 }
