@@ -6,6 +6,8 @@ import helmet from "helmet";
 import { env, isProduction, trustProxySetting } from "./config/env.js";
 import { createAuthController } from "./controllers/auth.controller.js";
 import { createConversationController } from "./controllers/conversation.controller.js";
+import { createLinkController } from "./controllers/link.controller.js";
+import { createMessageController } from "./controllers/message.controller.js";
 import { createUserController } from "./controllers/user.controller.js";
 import { prisma } from "./db/prisma.js";
 import { requireAuth } from "./middleware/auth.js";
@@ -23,6 +25,8 @@ import { createRefreshTokenRepository } from "./repositories/refresh-token.repos
 import { createUserRepository } from "./repositories/user.repository.js";
 import { createAuthRouter } from "./routes/auth.routes.js";
 import { createConversationRouter } from "./routes/conversation.routes.js";
+import { createLinkRouter } from "./routes/link.routes.js";
+import { createMessageRouter } from "./routes/message.routes.js";
 import { createUserRouter } from "./routes/user.routes.js";
 import {
   createAuthService,
@@ -32,6 +36,7 @@ import {
   createConversationService,
   type ConversationEvents,
 } from "./services/conversation.service.js";
+import { createLinkPreviewService } from "./services/link-preview.service.js";
 import { createMessageService } from "./services/message.service.js";
 import { createTokenService } from "./services/token.service.js";
 import { createUserService } from "./services/user.service.js";
@@ -93,12 +98,16 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     conversations: conversationRepository,
   });
 
+  const linkPreviewService = createLinkPreviewService({ redis: deps.redis });
+
   const authController = createAuthController({ service: authService, cookie });
   const userController = createUserController({ service: userService });
   const conversationController = createConversationController({
     conversations: conversationService,
     messages: messageService,
   });
+  const messageController = createMessageController({ messages: messageService });
+  const linkController = createLinkController({ previews: linkPreviewService });
 
   const limiter =
     deps.redis !== undefined
@@ -200,6 +209,36 @@ export function createApp(deps: CreateAppDeps = {}): Express {
           env.RATE_LIMIT_MESSAGE_WINDOW_MS,
         ),
         keyPrefix: "rl:write",
+      }),
+    }),
+  );
+
+  app.use(
+    "/api/messages",
+    createMessageRouter({
+      controller: messageController,
+      requireAuth: authGuard,
+      searchRateLimit: limit({
+        rule: ruleFromWindow(
+          env.RATE_LIMIT_SEARCH_MAX,
+          env.RATE_LIMIT_SEARCH_WINDOW_MS,
+        ),
+        keyPrefix: "rl:search",
+      }),
+    }),
+  );
+
+  app.use(
+    "/api/links",
+    createLinkRouter({
+      controller: linkController,
+      requireAuth: authGuard,
+      previewRateLimit: limit({
+        rule: ruleFromWindow(
+          env.RATE_LIMIT_SEARCH_MAX,
+          env.RATE_LIMIT_SEARCH_WINDOW_MS,
+        ),
+        keyPrefix: "rl:preview",
       }),
     }),
   );
