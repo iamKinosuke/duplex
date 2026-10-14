@@ -255,13 +255,13 @@ function MessageActions({
 
       <DropdownMenuContent
         align={mine ? "end" : "start"}
-        className="w-48 rounded-xl border-2 border-ink shadow-sticker"
+        className="w-52 rounded-xl border-2 border-ink shadow-sticker"
       >
-        <div className="flex gap-0.5 p-1">
+        <div className="flex items-center justify-between gap-1 p-1">
           {REACTION_EMOJIS.map((emoji) => (
             <DropdownMenuItem
               key={emoji}
-              className="cursor-pointer justify-center rounded-lg px-1.5 text-base"
+              className="size-7 shrink-0 cursor-pointer justify-center rounded-lg p-0 text-base"
               onSelect={() => actions.onReact(message.id, emoji)}
             >
               {emoji}
