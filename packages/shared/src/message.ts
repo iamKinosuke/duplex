@@ -15,13 +15,32 @@ export const zAttachment = z.object({
 });
 export type Attachment = z.infer<typeof zAttachment>;
 
+export const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"] as const;
+
+export const zReactionEmoji = z.enum(REACTION_EMOJIS);
+export type ReactionEmoji = z.infer<typeof zReactionEmoji>;
+
 export const zReactionSummary = z.object({
-  emoji: z.string(),
+  emoji: zReactionEmoji,
   count: z.number().int().positive(),
 
   mine: z.boolean(),
 });
 export type ReactionSummary = z.infer<typeof zReactionSummary>;
+
+export const zReactionGroup = z.object({
+  emoji: zReactionEmoji,
+  userIds: z.array(zId),
+});
+export type ReactionGroup = z.infer<typeof zReactionGroup>;
+
+export const zReplyPreview = z.object({
+  id: zId,
+  senderId: zId,
+  body: z.string().nullable(),
+  deleted: z.boolean(),
+});
+export type ReplyPreview = z.infer<typeof zReplyPreview>;
 
 export const zMessage = z.object({
   id: zId,
@@ -30,6 +49,7 @@ export const zMessage = z.object({
   type: zMessageType,
   body: z.string().nullable(),
   replyToId: zId.nullable(),
+  replyTo: zReplyPreview.nullable(),
   clientMsgId: z.uuid(),
   attachments: z.array(zAttachment),
   reactions: z.array(zReactionSummary),

@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { zId } from "./ids";
 import { zCallKind, zCallStatus } from "./enums";
-import { zSendMessageBody, zEditMessageBody, zMessage } from "./message";
+import {
+  zSendMessageBody,
+  zEditMessageBody,
+  zMessage,
+  zReactionEmoji,
+  zReactionGroup,
+} from "./message";
 import { zConversationSummary } from "./conversation";
 import { zPresence } from "./user";
 import { zApiError } from "./errors";
@@ -22,7 +28,7 @@ export type DeleteMessageEvent = z.infer<typeof zDeleteMessageEvent>;
 export const zToggleReactionEvent = z.object({
   messageId: zId,
 
-  emoji: z.string().min(1).max(16),
+  emoji: zReactionEmoji,
 });
 export type ToggleReactionEvent = z.infer<typeof zToggleReactionEvent>;
 
@@ -79,6 +85,21 @@ export type ReadUpdate = z.infer<typeof zReadUpdate>;
 export const zConversationRemoved = z.object({ conversationId: zId });
 export type ConversationRemoved = z.infer<typeof zConversationRemoved>;
 
+export const zMessageEdited = z.object({
+  conversationId: zId,
+  messageId: zId,
+  body: z.string(),
+  editedAt: z.iso.datetime(),
+});
+export type MessageEdited = z.infer<typeof zMessageEdited>;
+
+export const zReactionUpdate = z.object({
+  conversationId: zId,
+  messageId: zId,
+  reactions: z.array(zReactionGroup),
+});
+export type ReactionUpdate = z.infer<typeof zReactionUpdate>;
+
 export const zMessageDeleted = z.object({
   conversationId: zId,
   messageId: zId,
@@ -124,9 +145,9 @@ export interface ClientToServerEvents {
 
 export interface ServerToClientEvents {
   "message:new": (message: Message) => void;
-  "message:updated": (message: Message) => void;
+  "message:updated": (payload: MessageEdited) => void;
   "message:deleted": (payload: MessageDeleted) => void;
-  "reaction:updated": (message: Message) => void;
+  "reaction:updated": (payload: ReactionUpdate) => void;
   "typing:update": (payload: TypingUpdate) => void;
   "read:update": (payload: ReadUpdate) => void;
   "presence:update": (payload: Presence) => void;
