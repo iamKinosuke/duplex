@@ -1,34 +1,59 @@
 "use client";
 
-import type { Message } from "@duplex/shared";
+import type { Message, ReactionEmoji } from "@duplex/shared";
 import { Loader2 } from "lucide-react";
-import { Fragment, useEffect, useLayoutEffect, useRef } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConversation } from "@/features/conversation/queries";
-import { MessageBubble, PendingBubble, SystemMessage } from "./message-bubble";
+import {
+  MessageBubble,
+  PendingBubble,
+  SystemMessage,
+  type BubbleActions,
+} from "./message-bubble";
 import { metaFor } from "./message-meta";
 import { receiptLabel } from "./read-receipt";
-import { useReadReceipt } from "./use-read-receipt";
 import {
+  useDeleteMessage,
+  useEditMessage,
   useMessageHistory,
   usePendingMessages,
+  useToggleReaction,
   type PendingMessage,
 } from "./queries";
+import { useReadReceipt } from "./use-read-receipt";
+
+const HIGHLIGHT_MS = 1_400;
 
 export function MessageList({
   conversationId,
   myId,
   onRetry,
+  onReply,
 }: {
   conversationId: string;
   myId: string;
   onRetry: (pending: PendingMessage) => void;
+  onReply: (message: Message) => void;
 }) {
   const history = useMessageHistory(conversationId);
   const pending = usePendingMessages(conversationId);
   const conversation = useConversation(conversationId);
+
+  const edit = useEditMessage(conversationId);
+  const remove = useDeleteMessage(conversationId);
+  const react = useToggleReaction(conversationId);
+
+  const [editing, setEditing] = useState<{
+    conversationId: string;
+    messageId: string;
+  } | null>(null);
+  const [confirming, setConfirming] = useState<Message | null>(null);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
 
   const scroller = useRef<HTMLDivElement>(null);
   const anchorHeight = useRef<number | null>(null);
@@ -48,6 +73,9 @@ export function MessageList({
 
   const receipt = useReadReceipt(conversationId, myId, lastMine);
 
+  const editingId =
+    editing?.conversationId === conversationId ? editing.messageId : null;
+
   useLayoutEffect(() => {
     const node = scroller.current;
     if (node === null) return;
@@ -65,6 +93,20 @@ export function MessageList({
     stickToBottom.current = true;
   }, [conversationId]);
 
+  useEffect(() => {
+    if (highlighted === null) return;
+
+    const timer = setTimeout(() => setHighlighted(null), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [highlighted]);
+
+  useEffect(() => {
+    if (failure === null) return;
+
+    const timer = setTimeout(() => setFailure(null), 4_000);
+    return () => clearTimeout(timer);
+  }, [failure]);
+
   function onScroll() {
     const node = scroller.current;
     if (node === null) return;
@@ -77,6 +119,56 @@ export function MessageList({
       void history.fetchNextPage();
     }
   }
+
+  function report(cause: unknown, fallback: string) {
+    setFailure(cause instanceof Error ? cause.message : fallback);
+  }
+
+  function nameOf(userId: string): string | null {
+    return (
+      conversation.data?.members.find((member) => member.user.id === userId)
+        ?.user.displayName ?? null
+    );
+  }
+
+  const actions: BubbleActions = {
+    onReply,
+
+    onJump: (messageId) => {
+      const node = scroller.current?.querySelector(
+        `[data-message-id="${messageId}"]`,
+      );
+
+      if (node === null || node === undefined) return;
+
+      stickToBottom.current = false;
+      node.scrollIntoView({ block: "center", behavior: "smooth" });
+      setHighlighted(messageId);
+    },
+
+    onReact: (messageId, emoji: ReactionEmoji) => {
+      react.mutate(
+        { messageId, emoji },
+        { onError: (cause) => report(cause, "Could not react.") },
+      );
+    },
+
+    onDelete: (message) => setConfirming(message),
+
+    onStartEdit: (messageId) => setEditing({ conversationId, messageId }),
+
+    onCancelEdit: () => setEditing(null),
+
+    onSubmitEdit: (messageId, body) => {
+      edit.mutate(
+        { messageId, body },
+        {
+          onSuccess: () => setEditing(null),
+          onError: (cause) => report(cause, "Could not save that edit."),
+        },
+      );
+    },
+  };
 
   if (history.isPending) {
     return (
@@ -95,7 +187,7 @@ export function MessageList({
     <div
       ref={scroller}
       onScroll={onScroll}
-      className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+      className="relative min-h-0 flex-1 overflow-y-auto px-4 py-4"
     >
       {history.hasNextPage ? (
         <div className="mb-3 flex justify-center">
@@ -145,6 +237,15 @@ export function MessageList({
                   senderName={meta.senderName}
                   avatar={meta.endsRun ? sender : null}
                   gutter={conversation.data?.type === "group"}
+                  replyAuthor={
+                    message.replyTo === null
+                      ? null
+                      : nameOf(message.replyTo.senderId)
+                  }
+                  highlighted={highlighted === message.id}
+                  editing={editingId === message.id}
+                  busy={edit.isPending}
+                  actions={actions}
                 />
               )}
 
@@ -165,6 +266,33 @@ export function MessageList({
           />
         ))}
       </div>
+
+      {failure !== null ? (
+        <p className="sticky bottom-0 flex justify-center pt-2">
+          <span className="rounded-full border-2 border-destructive/60 bg-destructive/10 px-3 py-1 text-2xs font-medium">
+            {failure}
+          </span>
+        </p>
+      ) : null}
+
+      <ConfirmDialog
+        open={confirming !== null}
+        title="Delete this message?"
+        description="Everyone in the conversation will see that it was deleted."
+        confirmLabel="Delete"
+        pending={remove.isPending}
+        onConfirm={() => {
+          if (confirming === null) return;
+
+          remove.mutate(confirming.id, {
+            onSuccess: () => setConfirming(null),
+            onError: (cause) => report(cause, "Could not delete that message."),
+          });
+        }}
+        onOpenChange={(open) => {
+          if (!open) setConfirming(null);
+        }}
+      />
     </div>
   );
 }
