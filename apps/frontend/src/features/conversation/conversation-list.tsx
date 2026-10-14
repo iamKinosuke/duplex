@@ -19,7 +19,20 @@ function shortTime(iso: string): string {
     : at.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" });
 }
 
-export function ConversationList() {
+function matches(conversation: ConversationSummary, term: string): boolean {
+  const needle = term.trim().toLowerCase();
+  if (needle === "") return true;
+
+  const haystack = [
+    conversation.name,
+    conversation.peer?.displayName,
+    conversation.peer?.username,
+  ];
+
+  return haystack.some((value) => value?.toLowerCase().includes(needle) === true);
+}
+
+export function ConversationList({ filter = "" }: { filter?: string }) {
   const conversations = useConversations();
 
   if (conversations.isPending) {
@@ -32,7 +45,17 @@ export function ConversationList() {
     );
   }
 
-  const items = conversations.data ?? [];
+  const items = (conversations.data ?? []).filter((conversation) =>
+    matches(conversation, filter),
+  );
+
+  if (items.length === 0 && filter.trim() !== "") {
+    return (
+      <p className="px-4 py-3 text-xs text-muted-foreground">
+        No chats match “{filter.trim()}”.
+      </p>
+    );
+  }
 
   if (items.length === 0) {
     return (

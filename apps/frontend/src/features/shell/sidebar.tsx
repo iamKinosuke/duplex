@@ -1,8 +1,9 @@
 "use client";
 
 import type { Me } from "@duplex/shared";
-import { LogOut, Search, SquarePen, UserRound } from "lucide-react";
+import { LogOut, Search, SquarePen, UserRound, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { BrandWordmark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -26,10 +27,21 @@ import { ConversationList } from "@/features/conversation/conversation-list";
 import { NewConversationDialog } from "@/features/conversation/new-conversation-dialog";
 import { useLogout } from "@/features/auth/session";
 import { ProfileDialog } from "@/features/profile/profile-dialog";
+import { SearchResults } from "@/features/search/search-results";
 
 export function Sidebar({ me }: { me: Me }) {
   const router = useRouter();
   const logout = useLogout();
+
+  const [term, setTerm] = useState("");
+  const [debounced, setDebounced] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(term), 300);
+    return () => clearTimeout(timer);
+  }, [term]);
+
+  const searching = term.trim().length >= 2;
 
   async function signOut() {
     await logout.mutateAsync();
@@ -60,12 +72,37 @@ export function Sidebar({ me }: { me: Me }) {
       <div className="shrink-0 px-3 py-3">
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search conversations" className="pl-10" disabled />
+          <Input
+            value={term}
+            onChange={(event) => setTerm(event.target.value)}
+            placeholder="Search messages and chats"
+            className="pr-10 pl-10"
+          />
+          {term !== "" ? (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => setTerm("")}
+              className="absolute top-1/2 right-2.5 -translate-y-1/2"
+            >
+              <X />
+              <span className="sr-only">Clear search</span>
+            </Button>
+          ) : null}
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-2">
-        <ConversationList />
+        <ConversationList filter={term} />
+
+        {searching ? (
+          <>
+            <p className="px-4 pt-4 pb-1 font-display text-xs font-semibold text-muted-foreground uppercase">
+              Messages
+            </p>
+            <SearchResults term={debounced} />
+          </>
+        ) : null}
       </div>
 
       <footer className="shrink-0 border-t-2 border-hairline p-3">

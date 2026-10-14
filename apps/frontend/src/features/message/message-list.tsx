@@ -2,6 +2,7 @@
 
 import type { Message, ReactionEmoji } from "@duplex/shared";
 import { Loader2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ export function MessageList({
   } | null>(null);
   const [confirming, setConfirming] = useState<Message | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
   const scroller = useRef<HTMLDivElement>(null);
@@ -76,6 +78,9 @@ export function MessageList({
   const editingId =
     editing?.conversationId === conversationId ? editing.messageId : null;
 
+  const target = useSearchParams().get("m");
+  const chasing = target !== null && dismissed !== target;
+
   useLayoutEffect(() => {
     const node = scroller.current;
     if (node === null) return;
@@ -92,6 +97,22 @@ export function MessageList({
   useEffect(() => {
     stickToBottom.current = true;
   }, [conversationId]);
+
+  useEffect(() => {
+    if (!chasing || target === null) return;
+
+    const node = scroller.current?.querySelector(
+      `[data-message-id="${target}"]`,
+    );
+
+    if (node === null || node === undefined) return;
+
+    stickToBottom.current = false;
+    node.scrollIntoView({ block: "center" });
+
+    const timer = setTimeout(() => setDismissed(target), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [chasing, target, newest]);
 
   useEffect(() => {
     if (highlighted === null) return;
@@ -242,7 +263,10 @@ export function MessageList({
                       ? null
                       : nameOf(message.replyTo.senderId)
                   }
-                  highlighted={highlighted === message.id}
+                  highlighted={
+                    highlighted === message.id ||
+                    (chasing && target === message.id)
+                  }
                   editing={editingId === message.id}
                   busy={edit.isPending}
                   actions={actions}
