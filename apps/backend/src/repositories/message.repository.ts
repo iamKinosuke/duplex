@@ -45,6 +45,13 @@ export type MessageRow = Prisma.MessageGetPayload<{
   select: typeof messageSelect;
 }>;
 
+export interface MessageSearchOptions {
+  userId: bigint;
+  query: string;
+  before: bigint | null;
+  limit: number;
+}
+
 export interface MessagePageOptions {
   conversationId: bigint;
   before: bigint | null;
@@ -72,8 +79,18 @@ export class DuplicateClientMsgIdError extends Error {
   }
 }
 
+export function toBooleanQuery(input: string): string {
+  return input
+    .split(/\s+/u)
+    .map((term) => term.replace(/[+\-><()~*"@]/gu, ""))
+    .filter((term) => term.length > 0)
+    .map((term) => `+${term}*`)
+    .join(" ");
+}
+
 export interface MessageRepository {
   page(options: MessagePageOptions): Promise<MessagePageResult>;
+  search(options: MessageSearchOptions): Promise<MessagePageResult>;
   create(input: CreateMessageInput): Promise<MessageRow>;
   findByClientMsgId(clientMsgId: string): Promise<MessageRow | null>;
   existsInConversation(
@@ -110,6 +127,41 @@ export function createMessageRepository(client: PrismaClient): MessageRepository
       return {
         items,
         nextCursor: hasMore && oldest !== undefined ? oldest.id : null,
+      };
+    },
+
+    async search({ userId, query, before, limit }) {
+      const prepared = toBooleanQuery(query);
+
+      if (prepared === "") return { items: [], nextCursor: null };
+
+      const rows = await client.$queryRaw<Array<{ id: bigint }>>`
+        SELECT m.id AS id
+        FROM messages m
+        JOIN conversation_members cm
+          ON cm.conversation_id = m.conversation_id AND cm.user_id = ${userId}
+        WHERE MATCH(m.body) AGAINST(${prepared} IN BOOLEAN MODE)
+          AND m.deleted_at IS NULL
+          AND m.type <> 'SYSTEM'
+          AND (${before} IS NULL OR m.id < ${before})
+        ORDER BY m.id DESC
+        LIMIT ${limit + 1}
+      `;
+
+      const hasMore = rows.length > limit;
+      const ids = (hasMore ? rows.slice(0, limit) : rows).map((row) => row.id);
+
+      if (ids.length === 0) return { items: [], nextCursor: null };
+
+      const items = await client.message.findMany({
+        where: { id: { in: ids } },
+        select: messageSelect,
+        orderBy: { id: "desc" },
+      });
+
+      return {
+        items,
+        nextCursor: hasMore ? (ids.at(-1) ?? null) : null,
       };
     },
 

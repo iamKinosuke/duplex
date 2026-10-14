@@ -26,6 +26,13 @@ export interface MessageServiceDeps {
   conversations: ConversationRepository;
 }
 
+export interface SearchRequest {
+  userId: bigint;
+  query: string;
+  before: bigint | null;
+  limit: number;
+}
+
 export interface PageRequest {
   conversationId: bigint;
   userId: bigint;
@@ -91,6 +98,7 @@ export interface ReactionResult {
 
 export interface MessageService {
   page(request: PageRequest): Promise<MessagePage>;
+  search(request: SearchRequest): Promise<MessagePage>;
   send(request: SendRequest): Promise<SendResult>;
   markRead(request: MarkReadRequest): Promise<boolean>;
   edit(request: EditRequest): Promise<EditResult>;
@@ -141,6 +149,20 @@ export function createMessageService(deps: MessageServiceDeps): MessageService {
       await assertMember(conversationId, userId);
 
       const result = await deps.messages.page({ conversationId, before, limit });
+
+      return {
+        items: result.items.map((row) => toMessage(row, userId)),
+        nextCursor: result.nextCursor === null ? null : id(result.nextCursor),
+      };
+    },
+
+    async search({ userId, query, before, limit }) {
+      const result = await deps.messages.search({
+        userId,
+        query,
+        before,
+        limit,
+      });
 
       return {
         items: result.items.map((row) => toMessage(row, userId)),
