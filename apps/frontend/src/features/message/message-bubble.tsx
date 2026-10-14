@@ -27,6 +27,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/user-avatar";
+import { LinkCard } from "@/features/link/link-card";
+import { firstUrlIn } from "@/features/link/queries";
 import { cn } from "@/lib/utils";
 import type { PendingMessage } from "./queries";
 
@@ -83,6 +85,7 @@ export function MessageBubble({
   actions?: BubbleActions;
 }) {
   const deleted = message.deletedAt !== null;
+  const link = deleted || editing ? null : firstUrlIn(message.body);
 
   return (
     <div
@@ -142,6 +145,8 @@ export function MessageBubble({
               {deleted ? "This message was deleted" : message.body}
             </p>
           )}
+
+          {link !== null ? <LinkCard url={link} /> : null}
 
           <span className="mt-0.5 flex items-center justify-end gap-1 text-2xs opacity-70">
             {message.editedAt !== null && !deleted ? <span>edited</span> : null}
