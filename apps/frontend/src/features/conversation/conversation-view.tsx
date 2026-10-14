@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowLeft, Info, Loader2 } from "lucide-react";
+import { ArrowLeft, Info, Loader2, Reply, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import type { Message, ReplyPreview } from "@duplex/shared";
 import { randomUUID } from "@/lib/uuid";
 
 import { Button } from "@/components/ui/button";
@@ -43,17 +44,32 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const myId = session.data?.id ?? null;
 
   const [details, setDetails] = useState(false);
+  const [replyTo, setReplyTo] = useState<ReplyPreview | null>(null);
 
   const typing = useTypingSignal(conversationId);
   const typists = useTypingIn(conversationId, myId);
 
   function submit(body: string) {
     typing.onSent();
-    send.mutate({ clientMsgId: randomUUID(), body });
+    send.mutate({ clientMsgId: randomUUID(), body, replyTo });
+    setReplyTo(null);
   }
 
   function retry(pending: PendingMessage) {
-    send.mutate({ clientMsgId: pending.clientMsgId, body: pending.body });
+    send.mutate({
+      clientMsgId: pending.clientMsgId,
+      body: pending.body,
+      replyTo: pending.replyTo,
+    });
+  }
+
+  function quote(message: Message) {
+    setReplyTo({
+      id: message.id,
+      senderId: message.senderId,
+      body: (message.body ?? "").slice(0, 120),
+      deleted: message.deletedAt !== null,
+    });
   }
 
   if (conversation.isError) {
@@ -141,10 +157,36 @@ export function ConversationView({ conversationId }: { conversationId: string })
           conversationId={conversationId}
           myId={myId}
           onRetry={retry}
+          onReply={quote}
         />
       )}
 
       <TypingLine conversation={conversation.data ?? null} userIds={typists} />
+
+      {replyTo !== null ? (
+        <div className="flex shrink-0 items-center gap-2 border-t-2 border-hairline bg-surface-raised px-3 py-2 md:px-4">
+          <Reply className="size-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-2xs font-semibold">
+              Replying to{" "}
+              {conversation.data?.members.find(
+                (member) => member.user.id === replyTo.senderId,
+              )?.user.displayName ?? "someone"}
+            </span>
+            <span className="block truncate text-2xs text-muted-foreground">
+              {replyTo.deleted ? "This message was deleted" : replyTo.body}
+            </span>
+          </span>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => setReplyTo(null)}
+          >
+            <X />
+            <span className="sr-only">Cancel reply</span>
+          </Button>
+        </div>
+      ) : null}
 
       <Composer
         onSend={submit}

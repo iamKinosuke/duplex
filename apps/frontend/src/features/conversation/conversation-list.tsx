@@ -67,7 +67,13 @@ function ConversationRow({
 
   const title =
     conversation.peer?.displayName ?? conversation.name ?? "Conversation";
-  const preview = conversation.lastMessage?.body ?? "No messages yet";
+  const last = conversation.lastMessage;
+  const preview =
+    last === null
+      ? "No messages yet"
+      : last.deletedAt !== null
+        ? "This message was deleted"
+        : (last.body ?? "");
 
   return (
     <Link
