@@ -23,5 +23,12 @@ export function createUserRouter(deps: UserRouterDeps): Router {
     deps.controller.updateProfile,
   );
 
+  router.get(
+    "/:username",
+    deps.requireAuth,
+    deps.searchRateLimit,
+    deps.controller.profile,
+  );
+
   return router;
 }

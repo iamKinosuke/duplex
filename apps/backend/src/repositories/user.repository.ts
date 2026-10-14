@@ -60,6 +60,7 @@ export interface UserRepository {
   findByEmail(email: string): Promise<UserRecord | null>;
   findById(id: bigint): Promise<UserRecord | null>;
   existsById(id: bigint): Promise<boolean>;
+  findByUsername(username: string): Promise<PublicUserRow | null>;
   listNamesByIds(ids: bigint[]): Promise<NamedUserRow[]>;
   updateProfile(id: bigint, data: UpdateProfileData): Promise<UserRecord>;
   search(options: SearchUsersOptions): Promise<PublicUserRow[]>;
@@ -113,6 +114,13 @@ export function createUserRepository(client: PrismaClient): UserRepository {
         select: { id: true },
       });
       return row !== null;
+    },
+
+    async findByUsername(username) {
+      return await client.user.findUnique({
+        where: { username },
+        select: publicUserSelect,
+      });
     },
 
     async listNamesByIds(ids) {

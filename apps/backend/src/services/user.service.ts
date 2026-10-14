@@ -12,6 +12,7 @@ export interface UserService {
   me(userId: bigint): Promise<Me>;
   updateProfile(userId: bigint, body: UpdateProfileBody): Promise<Me>;
   search(userId: bigint, query: string, limit: number): Promise<User[]>;
+  profile(username: string): Promise<User>;
 }
 
 export function createUserService(deps: UserServiceDeps): UserService {
@@ -35,6 +36,16 @@ export function createUserService(deps: UserServiceDeps): UserService {
 
       const updated = await deps.users.updateProfile(userId, body);
       return toMe(updated);
+    },
+
+    async profile(username) {
+      const row = await deps.users.findByUsername(username);
+
+      if (row === null) {
+        throw AppError.notFound("That person does not exist.");
+      }
+
+      return toUser(row);
     },
 
     async search(userId, query, limit) {
