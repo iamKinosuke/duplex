@@ -14,7 +14,7 @@ export function useMessageSearch(term: string) {
 
   return useInfiniteQuery({
     queryKey: searchKeys.messages(query),
-    enabled: query.length >= 2,
+    enabled: query.length >= 1,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam }) =>
       apiFetch({

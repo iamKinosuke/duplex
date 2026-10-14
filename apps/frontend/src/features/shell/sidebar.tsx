@@ -41,7 +41,7 @@ export function Sidebar({ me }: { me: Me }) {
     return () => clearTimeout(timer);
   }, [term]);
 
-  const searching = term.trim().length >= 2;
+  const searching = term.trim() !== "";
 
   async function signOut() {
     await logout.mutateAsync();

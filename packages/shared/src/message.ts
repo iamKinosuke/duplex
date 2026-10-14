@@ -93,7 +93,7 @@ export const zMessagePageQuery = z.object({
 export type MessagePageQuery = z.infer<typeof zMessagePageQuery>;
 
 export const zMessageSearchQuery = z.object({
-  q: z.string().trim().min(2).max(100),
+  q: z.string().trim().min(1).max(100),
   before: zCursor,
   limit: z.coerce
     .number()

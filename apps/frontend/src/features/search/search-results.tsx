@@ -34,7 +34,7 @@ export function SearchResults({ term }: { term: string }) {
     (page) => page.items,
   );
 
-  if (results.isPending && term.trim().length >= 2) {
+  if (results.isPending && term.trim().length >= 1) {
     return (
       <p className="px-4 py-3 text-xs text-muted-foreground">
         <Loader2 className="mr-1.5 inline size-3 animate-spin" />
