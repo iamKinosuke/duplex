@@ -15,6 +15,8 @@ import {
   type Ack,
   type Message,
   type MessagePage,
+  type ReactionEmoji,
+  type ReplyPreview,
 } from "@duplex/shared";
 
 import { apiFetch } from "@/lib/api";
@@ -29,6 +31,7 @@ export const messageKeys = {
 export interface PendingMessage {
   clientMsgId: string;
   body: string;
+  replyTo: ReplyPreview | null;
   createdAt: string;
   status: "sending" | "failed";
   error: string | null;
@@ -109,9 +112,41 @@ export function appendMessage(
   );
 }
 
+export function patchMessage(
+  client: QueryClient,
+  conversationId: string,
+  messageId: string,
+  patch: (message: Message) => Message,
+): void {
+  client.setQueryData<InfiniteData<MessagePage, string | null>>(
+    messageKeys.history(conversationId),
+    (current) => {
+      if (current === undefined) return current;
+
+      let touched = false;
+
+      const pages = current.pages.map((page) => {
+        const index = page.items.findIndex((item) => item.id === messageId);
+        const found = index === -1 ? undefined : page.items[index];
+
+        if (found === undefined) return page;
+
+        const items = [...page.items];
+        items[index] = patch(found);
+        touched = true;
+
+        return { ...page, items };
+      });
+
+      return touched ? { ...current, pages } : current;
+    },
+  );
+}
+
 export interface SendVariables {
   clientMsgId: string;
   body: string;
+  replyTo?: ReplyPreview | null;
 }
 
 export function useSendMessage(conversationId: string) {
@@ -119,7 +154,7 @@ export function useSendMessage(conversationId: string) {
   const client = useQueryClient();
 
   return useMutation<Message, Error, SendVariables>({
-    mutationFn: async ({ clientMsgId, body }) => {
+    mutationFn: async ({ clientMsgId, body, replyTo }) => {
       if (socket === null || !socket.connected) {
         throw new Error("You are offline. The message was not sent.");
       }
@@ -132,6 +167,7 @@ export function useSendMessage(conversationId: string) {
             clientMsgId,
             type: "text",
             body,
+            replyToId: replyTo?.id ?? null,
             attachmentKeys: [],
           },
           resolve,
@@ -143,12 +179,13 @@ export function useSendMessage(conversationId: string) {
       return ack.data;
     },
 
-    onMutate: ({ clientMsgId, body }) => {
+    onMutate: ({ clientMsgId, body, replyTo }) => {
       setPending(client, conversationId, (list) => [
         ...list.filter((item) => item.clientMsgId !== clientMsgId),
         {
           clientMsgId,
           body,
+          replyTo: replyTo ?? null,
           createdAt: new Date().toISOString(),
           status: "sending",
           error: null,
@@ -169,6 +206,93 @@ export function useSendMessage(conversationId: string) {
             : item,
         ),
       );
+    },
+  });
+}
+
+export function useEditMessage(conversationId: string) {
+  const socket = useSocket();
+  const client = useQueryClient();
+
+  return useMutation<Message, Error, { messageId: string; body: string }>({
+    mutationFn: async ({ messageId, body }) => {
+      if (socket === null || !socket.connected) {
+        throw new Error("You are offline. Nothing was changed.");
+      }
+
+      const ack = await ackPromise<Ack<Message>>(socket, (resolve) => {
+        socket.emit("message:edit", { messageId: toId(messageId), body }, resolve);
+      });
+
+      if (!ack.ok) throw new Error(ack.error.message);
+
+      return ack.data;
+    },
+
+    onSuccess: (message) => {
+      patchMessage(client, conversationId, message.id, () => message);
+    },
+  });
+}
+
+export function useDeleteMessage(conversationId: string) {
+  const socket = useSocket();
+  const client = useQueryClient();
+
+  return useMutation<string, Error, string>({
+    mutationFn: async (messageId) => {
+      if (socket === null || !socket.connected) {
+        throw new Error("You are offline. Nothing was changed.");
+      }
+
+      const ack = await ackPromise<Ack<null>>(socket, (resolve) => {
+        socket.emit("message:delete", { messageId: toId(messageId) }, resolve);
+      });
+
+      if (!ack.ok) throw new Error(ack.error.message);
+
+      return messageId;
+    },
+
+    onSuccess: (messageId) => {
+      patchMessage(client, conversationId, messageId, (message) => ({
+        ...message,
+        body: null,
+        deletedAt: message.deletedAt ?? new Date().toISOString(),
+      }));
+    },
+  });
+}
+
+export function useToggleReaction(conversationId: string) {
+  const socket = useSocket();
+  const client = useQueryClient();
+
+  return useMutation<
+    Message,
+    Error,
+    { messageId: string; emoji: ReactionEmoji }
+  >({
+    mutationFn: async ({ messageId, emoji }) => {
+      if (socket === null || !socket.connected) {
+        throw new Error("You are offline. Nothing was changed.");
+      }
+
+      const ack = await ackPromise<Ack<Message>>(socket, (resolve) => {
+        socket.emit(
+          "reaction:toggle",
+          { messageId: toId(messageId), emoji },
+          resolve,
+        );
+      });
+
+      if (!ack.ok) throw new Error(ack.error.message);
+
+      return ack.data;
+    },
+
+    onSuccess: (message) => {
+      patchMessage(client, conversationId, message.id, () => message);
     },
   });
 }

@@ -7,7 +7,10 @@ import type {
   ConversationRemoved,
   ConversationSummary,
   Message,
+  MessageDeleted,
+  MessageEdited,
   Presence,
+  ReactionUpdate,
   ReadUpdate,
   TypingUpdate,
 } from "@duplex/shared";
@@ -15,6 +18,7 @@ import type {
 import {
   advanceReadCursor,
   conversationKeys,
+  patchLastMessage,
   removeConversation,
   upsertConversation,
 } from "@/features/conversation/queries";
@@ -23,6 +27,7 @@ import {
   appendMessage,
   dropPending,
   messageKeys,
+  patchMessage,
 } from "@/features/message/queries";
 import { applyPresence } from "@/features/presence/queries";
 import { applyTyping, clearTyping } from "@/features/typing/queries";
@@ -90,6 +95,54 @@ export function useRealtimeSync(): void {
       applyPresence(client, update);
     }
 
+    function onEdited({
+      conversationId,
+      messageId,
+      body,
+      editedAt,
+    }: MessageEdited): void {
+      const patch = (message: Message): Message => ({
+        ...message,
+        body,
+        editedAt,
+      });
+
+      patchMessage(client, conversationId, messageId, patch);
+      patchLastMessage(client, conversationId, messageId, patch);
+    }
+
+    function onDeleted({
+      conversationId,
+      messageId,
+      deletedAt,
+    }: MessageDeleted): void {
+      const patch = (message: Message): Message => ({
+        ...message,
+        body: null,
+        deletedAt,
+      });
+
+      patchMessage(client, conversationId, messageId, patch);
+      patchLastMessage(client, conversationId, messageId, patch);
+    }
+
+    function onReaction({
+      conversationId,
+      messageId,
+      reactions,
+    }: ReactionUpdate): void {
+      patchMessage(client, conversationId, messageId, (message) => ({
+        ...message,
+        reactions: reactions
+          .filter((group) => group.userIds.length > 0)
+          .map((group) => ({
+            emoji: group.emoji,
+            count: group.userIds.length,
+            mine: group.userIds.some((userId) => userId === myId),
+          })),
+      }));
+    }
+
     function onTyping(update: TypingUpdate): void {
       applyTyping(client, update);
     }
@@ -114,6 +167,9 @@ export function useRealtimeSync(): void {
     socket.on("message:new", onMessage);
     socket.on("conversation:upsert", onConversation);
     socket.on("presence:update", onPresence);
+    socket.on("message:updated", onEdited);
+    socket.on("message:deleted", onDeleted);
+    socket.on("reaction:updated", onReaction);
     socket.on("typing:update", onTyping);
     socket.on("read:update", onRead);
     socket.on("conversation:removed", onRemoved);
@@ -122,6 +178,9 @@ export function useRealtimeSync(): void {
       socket.off("message:new", onMessage);
       socket.off("conversation:upsert", onConversation);
       socket.off("presence:update", onPresence);
+      socket.off("message:updated", onEdited);
+      socket.off("message:deleted", onDeleted);
+      socket.off("reaction:updated", onReaction);
       socket.off("typing:update", onTyping);
       socket.off("read:update", onRead);
       socket.off("conversation:removed", onRemoved);

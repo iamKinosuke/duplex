@@ -14,6 +14,7 @@ import {
   zUserList,
   type ConversationDetail,
   type ConversationSummary,
+  type Message,
   type User,
 } from "@duplex/shared";
 
@@ -187,6 +188,25 @@ export function advanceReadCursor(
 
       return { ...current, members };
     },
+  );
+}
+
+export function patchLastMessage(
+  client: QueryClient,
+  conversationId: string,
+  messageId: string,
+  patch: (message: Message) => Message,
+): void {
+  client.setQueryData<ConversationSummary[]>(conversationKeys.all, (current) =>
+    current?.map((item) => {
+      const last = item.lastMessage;
+
+      if (item.id !== conversationId || last === null || last.id !== messageId) {
+        return item;
+      }
+
+      return { ...item, lastMessage: patch(last) };
+    }),
   );
 }
 
