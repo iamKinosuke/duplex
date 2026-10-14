@@ -92,6 +92,18 @@ export const zMessagePageQuery = z.object({
 });
 export type MessagePageQuery = z.infer<typeof zMessagePageQuery>;
 
+export const zMessageSearchQuery = z.object({
+  q: z.string().trim().min(2).max(100),
+  before: zCursor,
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(LIMITS.page.max)
+    .default(LIMITS.page.default),
+});
+export type MessageSearchQuery = z.infer<typeof zMessageSearchQuery>;
+
 export const zMessagePage = z.object({
   items: z.array(zMessage),
 
