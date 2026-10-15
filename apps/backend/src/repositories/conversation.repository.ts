@@ -140,6 +140,11 @@ export interface ConversationRepository {
   removeMember(input: RemoveMemberInput): Promise<GroupWriteResult>;
   transferOwner(input: TransferOwnerInput): Promise<GroupWriteResult>;
   unreadByMember(conversationId: bigint): Promise<MemberUnread[]>;
+  appendSystemMessage(
+    conversationId: bigint,
+    senderId: bigint,
+    body: string,
+  ): Promise<MessageRow>;
 }
 
 export function directKeyFor(a: bigint, b: bigint): string {
@@ -451,6 +456,13 @@ export function createConversationRepository(
           systemMessage,
         };
       });
+    },
+
+    async appendSystemMessage(conversationId, senderId, body) {
+      return await client.$transaction(
+        async (tx) =>
+          await writeSystemMessage(tx, conversationId, senderId, body),
+      );
     },
 
     async unreadByMember(conversationId) {
