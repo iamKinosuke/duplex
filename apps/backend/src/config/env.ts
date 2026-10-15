@@ -27,6 +27,13 @@ const schema = z.object({
 
   TRUST_PROXY: z.string().default("loopback"),
 
+  STUN_URLS: z
+    .string()
+    .default("stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"),
+  TURN_URL: z.string().optional(),
+  TURN_USERNAME: z.string().optional(),
+  TURN_PASSWORD: z.string().optional(),
+
   RATE_LIMIT_LOGIN_MAX: z.coerce.number().int().min(1).default(10),
   RATE_LIMIT_LOGIN_WINDOW_MS: z.coerce.number().int().min(1).default(300_000),
   RATE_LIMIT_MESSAGE_MAX: z.coerce.number().int().min(1).default(30),
@@ -64,6 +71,36 @@ export const databaseLabel = (() => {
     return "(unparseable DATABASE_URL)";
   }
 })();
+
+export function iceServers(): Array<{
+  urls: string[];
+  username?: string;
+  credential?: string;
+}> {
+  const stun = env.STUN_URLS.split(",")
+    .map((url) => url.trim())
+    .filter((url) => url !== "");
+
+  const servers: Array<{
+    urls: string[];
+    username?: string;
+    credential?: string;
+  }> = stun.length > 0 ? [{ urls: stun }] : [];
+
+  if (
+    env.TURN_URL !== undefined &&
+    env.TURN_USERNAME !== undefined &&
+    env.TURN_PASSWORD !== undefined
+  ) {
+    servers.push({
+      urls: [env.TURN_URL],
+      username: env.TURN_USERNAME,
+      credential: env.TURN_PASSWORD,
+    });
+  }
+
+  return servers;
+}
 
 export function trustProxySetting(): boolean | number | string {
   const raw = env.TRUST_PROXY.trim();
