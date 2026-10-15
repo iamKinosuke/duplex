@@ -24,6 +24,7 @@ import { createMessageRepository } from "./repositories/message.repository.js";
 import { createRefreshTokenRepository } from "./repositories/refresh-token.repository.js";
 import { createUserRepository } from "./repositories/user.repository.js";
 import { createAuthRouter } from "./routes/auth.routes.js";
+import { createCallRouter } from "./routes/call.routes.js";
 import { createConversationRouter } from "./routes/conversation.routes.js";
 import { createLinkRouter } from "./routes/link.routes.js";
 import { createMessageRouter } from "./routes/message.routes.js";
@@ -242,6 +243,8 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       }),
     }),
   );
+
+  app.use("/api/calls", createCallRouter({ requireAuth: authGuard }));
 
   app.use(notFoundHandler);
   app.use(createErrorHandler({ includeDebugDetails: !isProduction }));
