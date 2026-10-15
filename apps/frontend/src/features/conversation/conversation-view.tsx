@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Info, Loader2, Reply, X } from "lucide-react";
+import { ArrowLeft, Info, Loader2, Phone, Reply, Video, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { Message, ReplyPreview } from "@duplex/shared";
@@ -27,6 +27,7 @@ import { useIsOnline } from "@/features/presence/queries";
 import { useTypingIn } from "@/features/typing/queries";
 import { TypingLine } from "@/features/typing/typing-line";
 import { useTypingSignal } from "@/features/typing/use-typing-signal";
+import { useCall } from "@/features/call/call-provider";
 import { ConversationPanel } from "./conversation-panel";
 import { useConversation } from "./queries";
 
@@ -46,6 +47,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const [details, setDetails] = useState(false);
   const [replyTo, setReplyTo] = useState<ReplyPreview | null>(null);
 
+  const call = useCall();
   const typing = useTypingSignal(conversationId);
   const typists = useTypingIn(conversationId, myId);
 
@@ -129,15 +131,40 @@ export function ConversationView({ conversationId }: { conversationId: string })
               </p>
             </div>
 
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="ml-auto xl:hidden"
-              onClick={() => setDetails(true)}
-            >
-              <Info className="size-4" />
-              <span className="sr-only">Conversation details</span>
-            </Button>
+            <div className="ml-auto flex items-center gap-1">
+              {group ? null : (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={call.state.phase !== "idle"}
+                    onClick={() => void call.start(conversationId, "audio")}
+                  >
+                    <Phone className="size-4" />
+                    <span className="sr-only">Start a voice call</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={call.state.phase !== "idle"}
+                    onClick={() => void call.start(conversationId, "video")}
+                  >
+                    <Video className="size-4" />
+                    <span className="sr-only">Start a video call</span>
+                  </Button>
+                </>
+              )}
+
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="xl:hidden"
+                onClick={() => setDetails(true)}
+              >
+                <Info className="size-4" />
+                <span className="sr-only">Conversation details</span>
+              </Button>
+            </div>
           </>
         )}
       </header>

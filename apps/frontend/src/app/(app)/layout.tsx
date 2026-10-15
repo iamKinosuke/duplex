@@ -4,6 +4,8 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { RequireSession } from "@/features/auth/auth-gate";
+import { CallLayer } from "@/features/call/call-layer";
+import { CallProvider } from "@/features/call/call-provider";
 import { useSession } from "@/features/auth/session";
 import { ConversationPanel } from "@/features/conversation/conversation-panel";
 import { openConversationId } from "@/features/conversation/route";
@@ -17,7 +19,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <RequireSession>
       <SocketProvider>
-        <Shell>{children}</Shell>
+        <CallProvider>
+          <Shell>{children}</Shell>
+          <CallLayer />
+        </CallProvider>
       </SocketProvider>
     </RequireSession>
   );
