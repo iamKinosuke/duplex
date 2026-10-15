@@ -20,8 +20,10 @@ import {
 } from "../middleware/rate-limit.js";
 import type { ConversationRepository } from "../repositories/conversation.repository.js";
 import type { UserRepository } from "../repositories/user.repository.js";
+import type { CallService } from "../services/call.service.js";
 import type { MessageService } from "../services/message.service.js";
 import { createHandshakeAuth } from "./auth.js";
+import { announceClosed, registerCallHandlers } from "./handlers/call.js";
 import { registerMessageHandlers } from "./handlers/message.js";
 import { registerTypingHandlers } from "./handlers/typing.js";
 import type { PresenceTracker } from "./presence.js";
@@ -34,6 +36,9 @@ const TYPING_EVENTS_WINDOW_MS = 10_000;
 
 const MUTATE_EVENTS_MAX = 30;
 const MUTATE_EVENTS_WINDOW_MS = 10_000;
+
+const CALL_EVENTS_MAX = 60;
+const CALL_EVENTS_WINDOW_MS = 10_000;
 
 export type RealtimeServer = Server<
   ClientToServerEvents,
@@ -55,6 +60,7 @@ export interface RealtimeServerDeps {
   users: Pick<UserRepository, "existsById" | "touchLastSeen">;
   conversations: Pick<ConversationRepository, "idsForUser" | "peerIdsIn">;
   messages: MessageService;
+  calls: CallService;
   presence: PresenceTracker;
   secret: string;
   frontendOrigin: string;
@@ -87,6 +93,10 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
     MUTATE_EVENTS_MAX,
     MUTATE_EVENTS_WINDOW_MS,
   );
+  const callRule: RateLimitRule = ruleFromWindow(
+    CALL_EVENTS_MAX,
+    CALL_EVENTS_WINDOW_MS,
+  );
 
   io.use(createHandshakeAuth({ secret: deps.secret, users: deps.users }));
 
@@ -101,6 +111,7 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
     });
 
     registerTypingHandlers(socket, { io, typing, limiter, typingRule });
+    registerCallHandlers(socket, { io, calls: deps.calls, limiter, callRule });
 
     void welcome(socket);
   });
@@ -217,6 +228,9 @@ export function createRealtimeServer(deps: RealtimeServerDeps): RealtimeServer {
         const lastConnection = await presence.offline(userId, socket.id);
 
         if (lastConnection) {
+          const dropped = await deps.calls.dropFor(userId);
+          if (dropped !== null) announceClosed(io, dropped);
+
           const at = new Date();
           await deps.users.touchLastSeen(BigInt(userId), at);
 

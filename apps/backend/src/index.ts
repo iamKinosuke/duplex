@@ -6,11 +6,14 @@ import { assertDatabaseReachable, disconnectDatabase, prisma } from "./db/prisma
 import { logger } from "./lib/logger.js";
 import { connectRedis, createRedisClients } from "./lib/redis.js";
 import { createRealtimeBridge } from "./realtime/bridge.js";
+import { createCallStore } from "./realtime/calls.js";
 import { createPresenceTracker } from "./realtime/presence.js";
 import { createRealtimeServer } from "./realtime/server.js";
+import { createCallRepository } from "./repositories/call.repository.js";
 import { createConversationRepository } from "./repositories/conversation.repository.js";
 import { createMessageRepository } from "./repositories/message.repository.js";
 import { createUserRepository } from "./repositories/user.repository.js";
+import { createCallService } from "./services/call.service.js";
 import { createMessageService } from "./services/message.service.js";
 
 const SHUTDOWN_TIMEOUT_MS = 15_000;
@@ -35,12 +38,20 @@ async function main(): Promise<void> {
 
   const conversationRepository = createConversationRepository(prisma);
 
+  const callService = createCallService({
+    conversations: conversationRepository,
+    calls: createCallRepository(prisma),
+    store: createCallStore(redis),
+    presence,
+  });
+
   const io = createRealtimeServer({
     httpServer: server,
     redis,
     users: createUserRepository(prisma),
     conversations: conversationRepository,
     presence,
+    calls: callService,
     messages: createMessageService({
       messages: createMessageRepository(prisma),
       conversations: conversationRepository,
